@@ -1,0 +1,87 @@
+{
+  "confirmed": false,
+  "name": "tal rozen",
+  "headline": "Technical Solutions Developer | Digital Adoption & Web Technologies",
+  "phone": "054-229-4254",
+  "email": "tal.rozen01@gmail.com",
+  "links": [
+    {
+      "label": "LinkedIn",
+      "url": "https://linkedin.com/in/tal-rozen-"
+    }
+  ],
+  "summary": "Technical solutions professional with 3+ years of experience designing, developing, and implementing digital tools and interactive web experiences. Combines hands-on JavaScript development, UX/UI expertise, and user workflow analysis with a strong background in digital adoption, technical onboarding, and troubleshooting. Experienced in translating user needs into functional solutions, testing implementations, and continuously improving experiences based on real user feedback.",
+  "skills": [
+    "JavaScript",
+    "HTML",
+    "CSS",
+    "React",
+    "DOM-Based Web Interfaces",
+    "Responsive Design",
+    "APIs",
+    "Solution Implementation",
+    "Requirements Analysis",
+    "Workflow Analysis",
+    "Debugging",
+    "QA & Testing",
+    "Web Applications",
+    "Firebase",
+    "Git/GitHub",
+    "User Onboarding",
+    "Technical Enablement",
+    "User Experience",
+    "Process Improvement",
+    "Documentation",
+    "Stakeholder Collaboration",
+    "Chrome Developer Tools",
+    "Figma",
+    "Claude Code",
+    "OpenAI Codex",
+    "SQL"
+  ],
+  "employment": [
+    {
+      "id": "mindplay",
+      "title": "Learning Experience Designer & Digital Solutions Developer",
+      "company": "MINDPLAY",
+      "dates": "DEC 2022 \u2013 PRESENT",
+      "bullets": [
+        "Designed, developed, and implemented interactive web applications and digital solutions based on user needs and operational requirements.",
+        "Analyzed instructor and learner workflows, identified usability challenges, and translated findings into functional improvements and digital tools.",
+        "Built web-based solutions using JavaScript, React, Firebase, HTML, and CSS, including interactive interfaces and reusable components.",
+        "Tested application functionality, investigated technical issues, and refined implementations based on user feedback.",
+        "Designed and delivered digital onboarding experiences, technical training, and self-service resources to support user adoption.",
+        "Collaborated with stakeholders to understand requirements, resolve usability challenges, and improve existing digital workflows."
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "id": "project-0",
+      "name": "Mindplay Code",
+      "description": "Initiated and built a digital learning platform from concept to launch, defining product features, UX/UI, and user workflows including authentication, class management, coding environments, and progress tracking.",
+      "links": []
+    },
+    {
+      "id": "project-1",
+      "name": "Coding Exercises for Mindplay",
+      "description": "Designed and developed interactive web experiences with automated feedback, validation logic, and progress tracking.",
+      "links": []
+    },
+    {
+      "id": "project-2",
+      "name": "Portfolio",
+      "description": "Designed visual learning materials, illustrations, and digital educational content, using illustration and visual storytelling to translate complex concepts into clear, engaging, and accessible learning experiences.",
+      "links": []
+    }
+  ],
+  "education": [
+    {
+      "id": "hit",
+      "degree": "B.A. IN INSTRUCTIONAL DESIGN AND LEARNING TECHNOLOGIES",
+      "school": "HOLON INSTITUTE OF TECHNOLOGY (HIT)",
+      "dates": "OCT 2021 \u2013 OCT 2024"
+    }
+  ],
+  "achievements": []
+}
