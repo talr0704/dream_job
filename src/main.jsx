@@ -8,23 +8,23 @@ import {
   signOut,
   onAuthStateChanged,
 } from "firebase/auth";
-const initialProfile = {
-  confirmed: false,
-  name: "",
-  headline: "",
-  phone: "",
-  email: "",
-  links: [],
-  summary: "",
-  skills: [],
-  employment: [],
-  projects: [],
-  education: [],
-  achievements: [],
-};
+import "@fontsource/press-start-2p/latin-400.css";
+import "@fontsource/dm-sans/latin-400.css";
+import "@fontsource/dm-sans/latin-600.css";
+import "@fontsource/dm-sans/latin-700.css";
+import "@fontsource/dm-sans/latin-800.css";
 import { profileSchema, resumeProfile } from "../shared/model.js";
-import { renderResume, fitPaper } from "../shared/render.js";
-import { templateCSS } from "../shared/template-css.js";
+import { emptyProfile, profileDraftSchema } from "../shared/workspace.js";
+import {
+  destinations,
+  World,
+  Screen,
+  PixelButton,
+} from "./components/World.jsx";
+import { Journal } from "./components/Journal.jsx";
+import { Match } from "./components/Match.jsx";
+import { Builder } from "./components/Builder.jsx";
+import { Library } from "./components/Library.jsx";
 import "./style.css";
 const configured = !!import.meta.env.VITE_FIREBASE_API_KEY;
 const auth = configured
@@ -37,61 +37,87 @@ const auth = configured
     )
   : null;
 const apiBase = import.meta.env.VITE_API_URL || "";
-function saved() {
+const screenInfo = {
+  profile: ["CHARACTER JOURNAL", "MY PROFESSIONAL PROFILE"],
+  match: ["QUEST BOARD", "JOB MATCH"],
+  builder: ["CRAFTING STATION", "CV BUILDER"],
+  library: ["TREASURE CHEST", "MY RESUMES"],
+};
+function currentScreen() {
+  const id = location.hash.slice(1);
+  return screenInfo[id] ? id : "home";
+}
+function legacyBrowserProfile() {
   try {
-    return profileSchema.parse(
+    const parsed = profileDraftSchema.safeParse(
       JSON.parse(localStorage.getItem("dream-job-profile")),
     );
+    return parsed.success && parsed.data.name ? parsed.data : null;
   } catch {
-    return initialProfile;
+    return null;
   }
 }
 function App() {
-  const [profile, setProfile] = useState(saved),
-    [draft, setDraft] = useState(() => JSON.stringify(profile, null, 2)),
+  const [screen, setScreen] = useState(currentScreen),
+    [profile, setProfile] = useState(emptyProfile),
+    [revision, setRevision] = useState(0),
     [job, setJob] = useState(""),
+    [sourceJob, setSourceJob] = useState(""),
     [result, setResult] = useState(null),
-    [resume, setResume] = useState(profile),
-    [tab, setTab] = useState("Tailor"),
+    [resume, setResume] = useState(emptyProfile),
     [user, setUser] = useState(null),
+    [mode, setMode] = useState("offline"),
     [busy, setBusy] = useState(""),
     [error, setError] = useState(""),
-    [layout, setLayout] = useState(null),
+    [message, setMessage] = useState(""),
+    [items, setItems] = useState([]),
     [twoPages, setTwoPages] = useState(false),
-    [mode, setMode] = useState("offline"),
-    [editing, setEditing] = useState(false);
-  const frame = useRef();
+    [loaded, setLoaded] = useState(false),
+    [legacy, setLegacy] = useState(legacyBrowserProfile);
+  const requestIdentity = useRef(0);
+  const canUse = mode === "demo" || (mode === "authenticated" && !!user);
   useEffect(() => (auth ? onAuthStateChanged(auth, setUser) : undefined), []);
   useEffect(() => {
     fetch(apiBase + "/api/health")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw Error();
+        return r.json();
+      })
       .then((d) => setMode(d.mode))
       .catch(() => setMode("offline"));
   }, []);
   useEffect(() => {
-    if (mode === "offline" || (mode !== "demo" && !user) || profile.name)
-      return;
-    request("/api/profile", {})
-      .then((r) => r.json())
-      .then((p) => {
-        setProfile(p);
-        setResume(p);
-        setDraft(JSON.stringify(p, null, 2));
-      })
-      .catch((e) => setError(e.message));
-  }, [mode, user]);
-  useEffect(() => {
-    localStorage.setItem("dream-job-profile", JSON.stringify(profile));
-  }, [profile]);
-  async function request(path, body) {
+    const handler = () => {
+      setScreen(currentScreen());
+      setError("");
+      setMessage("");
+    };
+    window.addEventListener("hashchange", handler);
+    return () => window.removeEventListener("hashchange", handler);
+  }, []);
+  function go(id) {
+    if (id === screen) return;
+    location.hash = id;
+    setScreen(id);
+    setError("");
+    setMessage("");
+    window.scrollTo({ top: 0, behavior: "instant" });
+    requestAnimationFrame(() =>
+      document.getElementById(id + "-title")?.focus(),
+    );
+  }
+  async function request(path, body, method = "POST") {
     const token = user ? await user.getIdToken() : null;
+    const multipart = body instanceof FormData;
     const response = await fetch(apiBase + path, {
-      method: "POST",
+      method,
       headers: {
-        "Content-Type": "application/json",
+        ...(!multipart ? { "Content-Type": "application/json" } : {}),
         ...(token ? { Authorization: "Bearer " + token } : {}),
       },
-      body: JSON.stringify(body),
+      ...(body !== undefined
+        ? { body: multipart ? body : JSON.stringify(body) }
+        : {}),
     });
     if (!response.ok) {
       let data;
@@ -99,513 +125,341 @@ function App() {
         data = await response.json();
       } catch {}
       throw Error(
-        data?.error ||
-          "Backend unavailable. Check your connection and deployment configuration.",
+        data?.details
+          ? data.details
+              .map((i) => i.path.join(".") + ": " + i.message)
+              .join("; ")
+          : data?.error ||
+              "Backend unavailable. Check your connection or deployment configuration.",
       );
     }
     return response;
   }
-  async function generate(concise = false) {
-    setBusy(concise ? "Creating concise version…" : "Analyzing your fit…");
+  useEffect(() => {
+    const id = ++requestIdentity.current;
+    setLoaded(false);
+    setProfile(emptyProfile);
+    setResume(emptyProfile);
+    setItems([]);
+    setResult(null);
+    setSourceJob("");
+    setJob("");
     setError("");
-    try {
-      const response = await request("/api/generate", {
-        profile,
-        jobDescription: job,
-        concise,
+    if (!canUse) return;
+    Promise.all([
+      request("/api/profile", {}).then((r) => r.json()),
+      request("/api/resumes", undefined, "GET").then((r) => r.json()),
+    ])
+      .then(([p, collection]) => {
+        if (id !== requestIdentity.current) return;
+        const valid = profileDraftSchema.parse(p);
+        setProfile(valid);
+        setResume(valid);
+        setItems(collection);
+        setRevision((v) => v + 1);
+        setLoaded(true);
+      })
+      .catch((e) => {
+        if (id === requestIdentity.current) setError(e.message);
       });
-      const data = await response.json();
-      setResult(data);
-      setResume(resumeProfile(profile, data));
-      setEditing(false);
+    return () => {
+      requestIdentity.current++;
+    };
+  }, [mode, user?.uid]);
+  async function task(label, fn) {
+    setBusy(label);
+    setError("");
+    setMessage("");
+    try {
+      await fn();
+      return true;
     } catch (e) {
       setError(e.message);
+      return false;
     } finally {
       setBusy("");
     }
   }
-  async function download() {
-    setBusy("Rendering PDF…");
-    setError("");
-    try {
-      profileSchema.parse(resume);
-      const response = await request("/api/pdf", { profile: resume, twoPages });
+  async function saveProfile(p) {
+    return task("Saving profile…", async () => {
+      const response = await request("/api/profile", p, "PUT");
+      const saved = await response.json();
+      setProfile(saved);
+      setRevision((v) => v + 1);
+      setMessage("Journal saved. Existing saved resumes are unchanged.");
+      if (!result && !sourceJob) setResume(saved);
+    });
+  }
+  async function generate(concise = false) {
+    return task(
+      concise ? "Creating concise version…" : "Analyzing your fit…",
+      async () => {
+        const source = concise ? resume : profile;
+        const description = concise ? sourceJob : job;
+        const response = await request("/api/generate", {
+          profile: source,
+          jobDescription: description,
+          concise,
+        });
+        const data = await response.json();
+        setResult(data);
+        setResume(resumeProfile(source, data));
+        setSourceJob(description);
+        setTwoPages(false);
+        setMessage(
+          data.demo
+            ? "Local demo: profile preview generated. Job fit has not been assessed."
+            : "Tailored draft generated. Review all claims in CV Builder before sharing.",
+        );
+      },
+    );
+  }
+  async function download(p, pages = false) {
+    return task("Rendering PDF…", async () => {
+      profileSchema.parse(p);
+      const response = await request("/api/pdf", {
+        profile: p,
+        twoPages: pages,
+      });
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "tal-rozen-resume.pdf";
+      a.download = "tailored-resume.pdf";
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+  }
+  async function saveVersion(title, folder) {
+    return task("Saving version…", async () => {
+      const response = await request("/api/resumes", {
+        twoPages,
+        title: title.trim(),
+        folder: folder.trim(),
+        jobDescription: sourceJob,
+        profile: resume,
+        analysis: result,
+      });
+      const saved = await response.json();
+      setItems((list) => [saved, ...list]);
+      setMessage(
+        "New version saved to My Resumes. Earlier versions remain unchanged.",
+      );
+    });
+  }
+  async function organize(id, patch) {
+    return task("Organizing…", async () => {
+      const response = await request("/api/resumes/" + id, patch, "PATCH");
+      const saved = await response.json();
+      setItems((list) => list.map((i) => (i.id === id ? saved : i)));
+      setMessage("Collection updated.");
+    });
+  }
+  async function remove(id) {
+    return task("Deleting version…", async () => {
+      await request("/api/resumes/" + id, undefined, "DELETE");
+      setItems((list) => list.filter((i) => i.id !== id));
+      setMessage("Saved version deleted.");
+    });
+  }
+  function openVersion(item) {
+    setResume(structuredClone(item.profile));
+    setSourceJob(item.jobDescription);
+    setJob(item.jobDescription);
+    setResult(item.analysis);
+    setTwoPages(item.twoPages || false);
+    go("builder");
+    setMessage(
+      "Historical version opened. Save as a new version to keep your edits.",
+    );
+  }
+  async function account() {
+    try {
+      if (user) await signOut(auth);
+      else await signInWithPopup(auth, new GoogleAuthProvider());
     } catch (e) {
       setError(e.message);
-    } finally {
-      setBusy("");
     }
   }
-  function saveProfile() {
-    try {
-      const p = profileSchema.parse(JSON.parse(draft));
-      setProfile(p);
-      setResume(p);
-      setResult(null);
-      setError("");
-      setTab("Tailor");
-    } catch (e) {
-      setError(
-        e.issues
-          ? e.issues.map((i) => i.path.join(".") + ": " + i.message).join("; ")
-          : e.message,
-      );
-    }
-  }
-  function onPreview() {
-    const doc = frame.current.contentDocument;
-    const style = doc.createElement("style");
-    style.textContent = templateCSS;
-    doc.head.appendChild(style);
-    doc.body.innerHTML = renderResume(resume, {
-      pages: twoPages ? "two" : "one",
-    });
-    const fit = () => {
-      try {
-        const fn = frame.current.contentWindow.Function(
-          "return (" + fitPaper.toString() + ")()",
-        );
-        setLayout(fn());
-        const height = Math.ceil(
-          doc.querySelector(".paper").getBoundingClientRect().height + 2,
-        );
-        frame.current.style.height = height + "px";
-        const stage = frame.current.parentElement;
-        const width = Math.min(794, stage.parentElement.clientWidth - 32);
-        const scale = width / 794;
-        frame.current.style.transform = "scale(" + scale + ")";
-        stage.style.width = width + "px";
-        stage.style.height = height * scale + "px";
-      } catch (e) {
-        setError("Preview layout could not be measured.");
-      }
-    };
-    fit();
-    doc.fonts.ready.then(fit);
-  }
-  useEffect(() => {
-    if (frame.current) onPreview();
-    const resize = () => {
-      if (frame.current) onPreview();
-    };
-    window.addEventListener("resize", resize);
-    return () => window.removeEventListener("resize", resize);
-  }, [resume, twoPages, tab]);
-  function editText(key, value) {
-    setResume((r) => ({ ...r, [key]: value }));
-  }
-  const canUse = mode === "demo" || !!user;
   return (
-    <>
-      <header className="topbar">
-        <a className="brand" href="#">
-          d<span>j</span>
-          <b>
-            dream job<span>RESUME STUDIO</span>
-          </b>
-        </a>
-        <div className="account">
-          <span className={"connection " + (mode === "offline" ? "muted" : "")}>
-            {mode === "demo"
-              ? "Local demo · no AI"
-              : mode === "offline"
-                ? "Offline editor"
-                : "Secure AI backend"}
-          </span>
-          {auth ? (
-            <button
-              onClick={() =>
-                (user
-                  ? signOut(auth)
-                  : signInWithPopup(auth, new GoogleAuthProvider())
-                ).catch((e) => setError(e.message))
-              }
+    <div className="shell">
+      <header className="top">
+        <button
+          className="brand pixel"
+          onClick={() => go("home")}
+          aria-label="dream job home"
+        >
+          dream job ✦
+        </button>
+        <nav className="nav" aria-label="Main navigation">
+          {[
+            ["home", "Home"],
+            ...destinations.map(([id, label]) => [id, label]),
+          ].map(([id, label]) => (
+            <PixelButton
+              key={id}
+              aria-current={screen === id ? "page" : undefined}
+              onClick={() => go(id)}
             >
-              {user ? "Sign out" : "Sign in with Google"}
-            </button>
-          ) : (
-            <span className="small">Local profile stays in this browser</span>
-          )}
-        </div>
-      </header>
-      <main className="workspace">
-        <div className="intro">
-          <div>
-            <p className="eyebrow">YOUR NEXT CHAPTER</p>
-            <h1>
-              Your experience.
-              <br />
-              <span>A sharper story.</span>
-            </h1>
-            <p>
-              Turn your real experience into a resume built for the opportunity.
-            </p>
-          </div>
-          <div className="privacy">
-            <span>✦</span>
-            <p>
-              <strong>Grounded in your experience</strong>
-              <br />
-              Your facts. Your template. You make the final call.
-            </p>
-          </div>
-        </div>
-        <nav className="tabs">
-          {["Tailor", "Profile", "Template"].map((t) => (
-            <button
-              className={tab === t ? "active" : ""}
-              onClick={() => {
-                setTab(t);
-                setError("");
-              }}
-              key={t}
-            >
-              {t === "Tailor" ? "01" : t === "Profile" ? "02" : "03"} &nbsp; {t}
-            </button>
+              {label}
+            </PixelButton>
           ))}
         </nav>
+      </header>
+      <div className="session-bar">
+        <span className="session-mode">
+          {mode === "demo"
+            ? "Local demo · no AI"
+            : mode === "offline"
+              ? "Offline · backend not connected"
+              : user
+                ? "Secure session · " + user.email
+                : "Sign in for your private workspace"}
+        </span>
+        {auth && (
+          <PixelButton onClick={account}>
+            {user ? "Sign out" : "Sign in with Google"}
+          </PixelButton>
+        )}
+      </div>
+      <main>
         {error && (
-          <div role="alert" className="alert">
+          <div className="error" role="alert">
             {error}
+            <button
+              className="edit"
+              onClick={() => setError("")}
+              aria-label="Dismiss error"
+            >
+              ×
+            </button>
           </div>
         )}
-        <div className="notice">
-          Original resume PDF is missing. Profile text was imported from the
-          supplied HTML and needs your confirmation. Project and portfolio URLs
-          were not supplied.
-        </div>
-        {tab === "Profile" ? (
-          <section className="card">
-            <h2>Your professional profile</h2>
+        {message && (
+          <div className="status" role="status">
+            {message}
+          </div>
+        )}
+        {mode === "demo" && screen !== "home" && (
+          <p className="mode-note">
+            Local demo: editing, saved versions, and PDF export work. AI
+            analysis and profile extraction require the live backend.
+          </p>
+        )}
+        {screen === "profile" && canUse && loaded && legacy && (
+          <div className="note">
             <p>
-              Edit the structured facts below. Dates and contact details are
-              never rewritten by AI. Add real HTTPS URLs in the links arrays.
-              This information is stored locally and sent to the backend only
-              when you generate or export.
+              A profile from the previous browser editor is available. Load it
+              into your journal to review it before saving. Your stored profile
+              is unchanged until you save.
             </p>
-            <textarea
-              className="json-editor"
-              aria-label="Professional profile JSON"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-            />
-            <div className="actions">
-              <button className="primary" onClick={saveProfile}>
-                Save profile
-              </button>
-              <button
-                onClick={() => {
-                  localStorage.removeItem("dream-job-profile");
-                  setProfile(initialProfile);
-                  setResume(initialProfile);
-                  setDraft(JSON.stringify(initialProfile, null, 2));
-                  setResult(null);
-                }}
-              >
-                Reset local profile
-              </button>
-            </div>
-          </section>
-        ) : (
-          <div className="columns">
-            <aside>
-              {tab === "Tailor" ? (
-                <>
-                  <section className="card">
-                    <p className="eyebrow">01 / THE OPPORTUNITY</p>
-                    <h2>What’s your next role?</h2>
-                    <label htmlFor="job">Job description</label>
-                    <textarea
-                      id="job"
-                      placeholder="Paste the full job description here, including responsibilities and requirements…"
-                      value={job}
-                      maxLength={18000}
-                      onChange={(e) => setJob(e.target.value)}
-                    />
-                    <div className="input-meta">
-                      <span>Include requirements for a better match</span>
-                      <span>{job.length.toLocaleString()} / 18,000</span>
-                    </div>
-                    <label className="check">
-                      <input
-                        type="checkbox"
-                        checked={profile.confirmed}
-                        onChange={(e) => {
-                          const p = { ...profile, confirmed: e.target.checked };
-                          setProfile(p);
-                          setResume((r) => ({ ...r, confirmed: p.confirmed }));
-                          setDraft(JSON.stringify(p, null, 2));
-                        }}
-                      />
-                      I reviewed and confirm the profile facts and links.
-                    </label>
-                    <button
-                      className="primary wide"
-                      disabled={
-                        !!busy ||
-                        !profile.confirmed ||
-                        job.trim().length < 40 ||
-                        !canUse
-                      }
-                      onClick={() => generate()}
-                    >
-                      ✦ &nbsp; {busy || "Analyze & Generate"}
-                    </button>
-                    {!canUse && (
-                      <p className="small">
-                        {auth
-                          ? "Sign in to use AI and PDF export."
-                          : "Configure Firebase and the backend for AI and PDF export. You can edit and preview now."}
-                      </p>
-                    )}
-                  </section>
-                  {result ? (
-                    <section className="card analysis">
-                      <p className="eyebrow">02 / YOUR MATCH</p>
-                      <div className="score">
-                        <strong>
-                          {result.demo ? "—" : result.score}
-                          <small>{result.demo ? "Demo" : " / 100"}</small>
-                        </strong>
-                        <span>{result.jobTitle}</span>
-                      </div>
-                      <p className="small">
-                        Estimated fit, not hiring probability. Mandatory
-                        requirements weigh 3× preferred; partial matches earn
-                        half credit.
-                      </p>
-                      {[
-                        ["Strengths", result.strengths],
-                        ["Potential gaps", result.gaps],
-                        ["Resume emphasis", result.recommendations],
-                        ["Relevant skills", result.relevantSkills],
-                      ].map(([title, items]) => (
-                        <div key={title}>
-                          <h3>{title}</h3>
-                          <ul>
-                            {items.map((s, i) => (
-                              <li key={i}>{s}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      ))}
-                      <h3>Experience alignment</h3>
-                      <p>{result.experienceAlignment}</p>
-                      <h3>Requirements and evidence</h3>
-                      {result.requirements.map((r, i) => (
-                        <div className="requirement" key={i}>
-                          <b>
-                            {r.status.toUpperCase()} ·{" "}
-                            {r.mandatory ? "Mandatory" : "Preferred"}
-                          </b>
-                          <p>{r.requirement}</p>
-                          <small>
-                            {r.evidence || "No supporting evidence"}
-                          </small>
-                        </div>
-                      ))}
-                    </section>
-                  ) : (
-                    <section className="card steps">
-                      <p className="eyebrow">BUILT AROUND YOUR TRUTH</p>
-                      <h3>A focused resume, in three steps</h3>
-                      <p>
-                        <b>1</b> Confirm your professional profile
-                      </p>
-                      <p>
-                        <b>2</b> Analyze the opportunity
-                      </p>
-                      <p>
-                        <b>3</b> Review, refine, and export
-                      </p>
-                    </section>
-                  )}
-                </>
-              ) : (
-                <section className="card">
-                  <h2>Your approved template</h2>
-                  <p>
-                    The supplied v5 design is preserved, including the blue
-                    header, two-column section layout, typography, and adaptive
-                    spacing.
-                  </p>
-                  <p>
-                    Font sizes stay fixed while whitespace adapts. Longer
-                    content is never hidden.
-                  </p>
-                  <p>
-                    The unmodified original is retained in
-                    templates/resume_template_dynamic_v5.html.
-                  </p>
-                </section>
-              )}
-            </aside>
-            <section className="preview-panel">
-              <div className="preview-toolbar">
-                <div>
-                  <p className="eyebrow">LIVE PREVIEW</p>
-                  <h2>
-                    {result
-                      ? "Your tailored resume"
-                      : "Your resume, ready to refine"}
-                  </h2>
-                </div>
-                <button onClick={() => setEditing(!editing)}>
-                  {editing ? "Done editing" : "Edit resume"}
-                </button>
-              </div>
-              <div className="layout-status">
-                <span className={layout?.overflow ? "warn" : "fit"}>
-                  {layout
-                    ? layout.overflow
-                      ? "Exceeds one A4 page"
-                      : `A4 fit · ${layout.density} spacing`
-                    : "Measuring layout…"}
-                </span>
-                <span>Selectable text · live links</span>
-              </div>
-              {layout?.overflow && (
-                <div className="notice">
-                  Spacing is at its compact limit. Generate a concise version,
-                  shorten text manually, or choose two pages. Export never
-                  silently crops content.
-                  {result && (
-                    <button
-                      disabled={!!busy || !canUse}
-                      onClick={() => generate(true)}
-                    >
-                      Create concise version
-                    </button>
-                  )}
-                </div>
-              )}
-              {editing && (
-                <div className="resume-editor">
-                  <label>
-                    Headline
-                    <input
-                      value={resume.headline}
-                      onChange={(e) => editText("headline", e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    Summary
-                    <textarea
-                      value={resume.summary}
-                      onChange={(e) => editText("summary", e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    Skills (one per line)
-                    <textarea
-                      value={resume.skills.join("\n")}
-                      onChange={(e) =>
-                        editText("skills", e.target.value.split("\n"))
-                      }
-                    />
-                  </label>
-                  {resume.employment.map((j, i) => (
-                    <div key={j.id}>
-                      <h3>{j.title}</h3>
-                      {j.bullets.map((b, k) => (
-                        <textarea
-                          aria-label={`Experience ${i + 1} bullet ${k + 1}`}
-                          key={k}
-                          value={b}
-                          onChange={(e) =>
-                            setResume((r) => ({
-                              ...r,
-                              employment: r.employment.map((x, n) =>
-                                n === i
-                                  ? {
-                                      ...x,
-                                      bullets: x.bullets.map((s, m) =>
-                                        m === k ? e.target.value : s,
-                                      ),
-                                    }
-                                  : x,
-                              ),
-                            }))
-                          }
-                        />
-                      ))}
-                    </div>
-                  ))}
-                  {resume.projects.map((p, i) => (
-                    <label key={p.id}>
-                      {p.name}
-                      <textarea
-                        value={p.description}
-                        onChange={(e) =>
-                          setResume((r) => ({
-                            ...r,
-                            projects: r.projects.map((x, n) =>
-                              n === i
-                                ? { ...x, description: e.target.value }
-                                : x,
-                            ),
-                          }))
-                        }
-                      />
-                    </label>
-                  ))}
-                  <p className="small">
-                    Your manual edits are not independently fact checked. Review
-                    before exporting.
-                  </p>
-                </div>
-              )}
-              <div className="paper-viewport">
-                <div className="paper-stage">
-                  <iframe
-                    title="Resume preview"
-                    ref={frame}
-                    srcDoc="<!doctype html><html><head></head><body></body></html>"
-                    onLoad={onPreview}
-                  />
-                </div>
-              </div>
-              <div className="export-bar">
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={twoPages}
-                    onChange={(e) => setTwoPages(e.target.checked)}
-                  />
-                  Allow two pages
-                </label>
-                <button
-                  className="primary"
-                  disabled={
-                    !!busy ||
-                    !canUse ||
-                    !resume.confirmed ||
-                    (!twoPages && layout?.overflow)
-                  }
-                  onClick={download}
-                >
-                  {busy === "Rendering PDF…" ? busy : "Download PDF ↓"}
-                </button>
-              </div>
-              <p className="small export-note">
-                PDF uses the same template and spacing as this preview. Review
-                every statement and link before sharing.
-              </p>
-            </section>
+            <PixelButton
+              onClick={() => {
+                setProfile({ ...legacy, confirmed: false });
+                setRevision((v) => v + 1);
+                setLegacy(null);
+                setMessage(
+                  "Previous browser profile loaded for review. Confirm and save to keep it in your private workspace.",
+                );
+              }}
+            >
+              Review previous browser profile
+            </PixelButton>
           </div>
         )}
-        <footer>
-          Made for your next move. &nbsp; · &nbsp; Private by design.
-        </footer>
+        {screen === "home" ? (
+          <World go={go} />
+        ) : (
+          <Screen
+            id={screen}
+            eyebrow={screenInfo[screen][0]}
+            title={screenInfo[screen][1]}
+          >
+            {!canUse ? (
+              <div className="panel">
+                <h2>Your private career adventure</h2>
+                <p>
+                  {mode === "offline"
+                    ? "Start the backend to load your profile and saved resumes."
+                    : "Sign in with an authorized Google account to load your private workspace."}
+                </p>
+                {auth && !user && (
+                  <PixelButton onClick={account}>
+                    Sign in with Google
+                  </PixelButton>
+                )}
+              </div>
+            ) : !loaded ? (
+              <div className="panel" role="status">
+                Opening your career journal…
+              </div>
+            ) : (
+              <>
+                {screen === "profile" && (
+                  <Journal
+                    key={revision}
+                    profile={profile}
+                    onSave={saveProfile}
+                    canUse={canUse}
+                    busy={!!busy}
+                    request={request}
+                    notify={setMessage}
+                  />
+                )}{" "}
+                {screen === "match" && (
+                  <Match
+                    profile={profile}
+                    job={job}
+                    setJob={setJob}
+                    result={result}
+                    generate={generate}
+                    busy={busy}
+                    canUse={canUse}
+                    go={go}
+                  />
+                )}{" "}
+                {screen === "builder" && (
+                  <Builder
+                    resume={resume}
+                    setResume={setResume}
+                    twoPages={twoPages}
+                    setTwoPages={setTwoPages}
+                    busy={busy}
+                    canUse={canUse}
+                    download={download}
+                    onSaveVersion={saveVersion}
+                    sourceJob={sourceJob}
+                    concise={() => generate(true)}
+                    go={go}
+                  />
+                )}{" "}
+                {screen === "library" && (
+                  <Library
+                    items={items}
+                    onOpen={openVersion}
+                    onDownload={download}
+                    onOrganize={organize}
+                    onDelete={remove}
+                    canUse={canUse}
+                    busy={busy}
+                    go={go}
+                  />
+                )}
+              </>
+            )}
+            <div className="back-world">
+              <PixelButton onClick={() => go("home")}>
+                ← Back to Cloud World
+              </PixelButton>
+            </div>
+          </Screen>
+        )}
       </main>
-    </>
+      <footer className="footer">
+        dream job · your story, your next chapter{" "}
+        <span aria-hidden="true">✦</span>
+      </footer>
+    </div>
   );
 }
 createRoot(document.getElementById("root")).render(<App />);

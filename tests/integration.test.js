@@ -50,14 +50,12 @@ test("short, medium and long layouts retain all text; overflow requires explicit
       await assert.rejects(exportPDF({ ...p, summary }), /exceeds one/);
     } else {
       assert.equal(layout.overflow, false, name);
-      const box = await page
-        .locator(".section")
-        .evaluateAll((nodes) =>
-          nodes.map((n) => ({
-            top: n.getBoundingClientRect().top,
-            bottom: n.getBoundingClientRect().bottom,
-          })),
-        );
+      const box = await page.locator(".section").evaluateAll((nodes) =>
+        nodes.map((n) => ({
+          top: n.getBoundingClientRect().top,
+          bottom: n.getBoundingClientRect().bottom,
+        })),
+      );
       for (let i = 1; i < box.length; i++)
         assert.ok(box[i].top >= box[i - 1].bottom - 1);
     }
