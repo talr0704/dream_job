@@ -21,7 +21,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install-deps chromium
-      - run: npm test && npm run test:integration
+      - run: npm test && npm run test:integration && npm run test:workspace && npm run test:ui
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-and-pdf-checks
+          path: artifacts/
       - run: npm run build
         env:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/

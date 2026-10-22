@@ -16,7 +16,9 @@ export async function getBrowser() {
           ? packagedChromium.args.filter((arg) => arg !== "--single-process")
           : ["--no-sandbox"],
       });
-      browser.on("disconnected", () => { browserPromise = null; });
+      browser.on("disconnected", () => {
+        browserPromise = null;
+      });
       return browser;
     })().catch((e) => {
       browserPromise = null;
