@@ -23,10 +23,13 @@ export function deploymentPlan(sameOrigin = false) {
   if (sameOrigin) {
     if (config.vars.ALLOWED_ORIGIN !== productionOrigin)
       throw Error("Wrong same-origin production URL");
-    if ("ACCESS_AUD" in config.vars || "ACCESS_TEAM_DOMAIN" in config.vars)
-      throw Error(
-        "Same-origin deployment must retain the existing Access bindings",
-      );
+    if (
+      !config.vars.ACCESS_AUD?.trim() ||
+      !/^[a-z0-9-]+\.cloudflareaccess\.com$/.test(
+        config.vars.ACCESS_TEAM_DOMAIN,
+      )
+    )
+      throw Error("The existing Access audience and team domain are required");
     if (
       config.assets?.directory !== "./dist" ||
       !config.assets.run_worker_first.includes("/api/*")

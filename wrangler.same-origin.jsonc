@@ -5,13 +5,15 @@
   "compatibility_date": "2026-10-01",
   "workers_dev": true,
   "preview_urls": true,
-  // Retain the existing dashboard Access bindings; never override them with blanks.
+  // Reuse the existing Access application bindings configured in wrangler.jsonc.
   // OPENAI_API_KEY remains the existing Worker secret.
   "keep_vars": true,
   "observability": {
     "enabled": false,
   },
   "vars": {
+    "ACCESS_AUD": "3d935a1b79768cce6a09e6425da1b75deef48446e252988b17dd2924b3ee2c94",
+    "ACCESS_TEAM_DOMAIN": "ancient-sun-7f49.cloudflareaccess.com",
     "OPENAI_MODEL": "gpt-4.1-mini",
     "ALLOWED_ORIGIN": "https://dream-job-api.tal070498.workers.dev",
   },

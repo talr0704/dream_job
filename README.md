@@ -94,7 +94,7 @@ The deployment wrapper refuses missing configuration/different Worker names, rer
 
 For GitHub Pages, set the public Actions variable `VITE_API_URL` to the API origin, configure Settings → Pages → GitHub Actions, then manually run the workflow with `publish_frontend=true` only when frontend publication is approved. This does not resolve the cross-site Access constraint above.
 
-For the separately approved **same-origin alternative**, retain the existing Access bindings using `keep_vars:true` (do not add blank local overrides), build with empty `VITE_API_URL` and `/` base, review the static asset policy and run `npm run worker:deploy -- --same-origin` only after approval. The wrapper builds with those same-origin values and selects the alternate config. Do not switch configurations without exporting the current browser's data first.
+For the separately approved **same-origin alternative**, reuse the existing configured Access bindings (do not add blank overrides), build with empty `VITE_API_URL` and `/` base, review the static asset policy and run `npm run worker:deploy -- --same-origin` only after approval. The wrapper builds with those same-origin values and selects the alternate config. Do not switch configurations without exporting the current browser's data first.
 
 ## Source map and practical limits
 
@@ -116,7 +116,7 @@ The final local validation completed successfully: 26 mocked Vitest tests; 7 ret
 
 Production frontend and API origin: **https://dream-job-api.tal070498.workers.dev**. Use the existing `wrangler.same-origin.jsonc`, whose Worker name is `dream-job-api`; API requests under `/api/*` run Worker code first and other requests serve `dist/` static assets. No new Worker or route/domain registration is configured.
 
-This config sets `ALLOWED_ORIGIN` to the production origin. It intentionally **omits** `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` from local vars, using `keep_vars:true` to retain the existing dashboard bindings. It does not declare or replace `OPENAI_API_KEY`. The workspace has no Cloudflare credentials, so the live bindings, Worker ownership/account and Access policy cannot be independently checked here. Before an approved deploy, confirm those two existing Access bindings are present and nonempty in the existing Worker's settings. Never replace them with test values. Preserve Access All traffic protection, account-member Allow policy and preview protection. No Access bypass or policy mutation is performed by these scripts. Local workerd tests do not emulate the Cloudflare Access edge.
+This config sets `ALLOWED_ORIGIN` to the production origin. It reuses the `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` already configured in `wrangler.jsonc` on main. `keep_vars:true` also preserves unrelated dashboard variables. It does not declare or replace `OPENAI_API_KEY`. The workspace has no Cloudflare credentials, so the live bindings, Worker ownership/account and Access policy cannot be independently checked here. Before an approved deploy, confirm those two existing Access bindings are present and nonempty in the existing Worker's settings. Never replace them with test values. Preserve Access All traffic protection, account-member Allow policy and preview protection. No Access bypass or policy mutation is performed by these scripts. Local workerd tests do not emulate the Cloudflare Access edge.
 
 Preparation commands (no deployment):
 
@@ -140,3 +140,5 @@ node scripts/check-same-origin.mjs
 A GitHub Pages origin is shared by all repositories under the same hostname; the repository path is not a distinct IndexedDB origin. The workers.dev hostname above is a separate origin, so exporting and importing is required.
 
 Same-origin preparation validation: 27 Vitest tests, 7 regression tests, 3 PDF integration tests and 4 Playwright workflows passed. The same-origin production build and matching Wrangler dry-run passed (16 static files included). Local workerd served HTML and root JS/CSS assets with HTTP 200; unauthenticated API returned 401, unknown `/api/*` returned JSON 404 rather than SPA HTML, and a wrong origin returned 403. This verifies local routing, not the live Access edge or existing remote binding values. Nothing was deployed.
+
+The existing Access audience/team values were found in updated GitHub main and copied unchanged into the same-origin configuration. Tests assert that both configurations use the same Access application. Live Cloudflare policy/binding state has not been independently inspected.
