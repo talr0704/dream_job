@@ -161,6 +161,7 @@ export function Field({ label, value, onChange, multiline = false, ...props }) {
     <label className="form-field">
       <span>{label}</span>
       <Tag
+        aria-label={label}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         {...props}

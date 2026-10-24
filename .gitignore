@@ -7,3 +7,10 @@ artifacts/
 *.log
 
 .local/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.wrangler/
+work/
+playwright-report/
+test-results/

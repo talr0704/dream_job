@@ -1,0 +1,1 @@
+Archived pre-migration Express/Firebase implementation and original backend/UI tests. Retained for reference; not part of the active runtime, dependency set, test commands, or deployment. Relative imports reflect their original locations. `server/pdf.js` in the active tree is a local-only Chromium test utility; no PDF server is deployed.

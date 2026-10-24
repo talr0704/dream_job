@@ -5,41 +5,43 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
-    "start": "node --env-file-if-exists=.env server/index.js",
-    "test": "node --test tests/unit.test.js",
+    "build": "npm run typecheck && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:legacy": "node --test tests/unit.test.js",
     "test:integration": "node --test tests/integration.test.js",
-    "test:ui": "node --test tests/ui.test.js",
-    "test:workspace": "node --test tests/workspace.test.js"
+    "test:workspace": "vitest run tests/cloudflare/storage.test.ts",
+    "test:ui": "playwright test",
+    "worker:dev": "wrangler dev --local",
+    "worker:check": "wrangler deploy --dry-run --outdir work/worker-build",
+    "worker:deploy": "node scripts/deploy-worker.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.3.0",
     "@fontsource/press-start-2p": "^5.3.0",
     "@sparticuz/chromium": "^153.0.0",
     "@vitejs/plugin-react": "latest",
-    "cors": "^2.8.5",
-    "express": "^5.1.0",
-    "express-rate-limit": "^8.0.0",
-    "firebase": "^13.1.0",
-    "firebase-admin": "^14.5.0",
-    "helmet": "^8.0.0",
-    "mammoth": "^1.13.0",
-    "multer": "^2.5.0",
-    "openai": "^6.0.0",
+    "dexie": "^4.4.7",
+    "jose": "^6.2.13",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.4.299",
     "playwright": "^1.56.0",
     "react": "latest",
     "react-dom": "latest",
     "vite": "latest",
-    "yauzl": "^3.4.0",
-    "zod": "^3.24.0"
+    "zod": "^3.24.0",
+    "zod-to-json-schema": "^3.25.2",
+    "fflate": "^0.8.3"
   },
   "devDependencies": {
-    "fflate": "^0.8.3",
-    "prettier": "^3.9.10"
-  },
-  "overrides": {
-    "@grpc/grpc-js": "^1.14.6"
+    "@cloudflare/workers-types": "^5.20261024.1",
+    "@playwright/test": "^1.64.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "fake-indexeddb": "^6.2.6",
+    "prettier": "^3.9.10",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5",
+    "wrangler": "^4.152.0"
   }
 }

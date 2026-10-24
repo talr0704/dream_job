@@ -8,6 +8,8 @@ const split = (s) =>
     .filter(Boolean);
 const sections = {
   personal: "Character information",
+  certifications: "Certifications",
+  languages: "Languages",
   employment: "Work experience",
   education: "Education",
   skills: "Skills",
@@ -70,6 +72,7 @@ function SectionEditor({ section, value, setValue }) {
         {field("Professional title", "headline")}
         {field("Email address", "email")}
         {field("Phone number", "phone")}
+        {field("Location", "location")}
       </>
     );
   if (section === "summary")
@@ -98,6 +101,23 @@ function SectionEditor({ section, value, setValue }) {
   if (section === "links")
     return <LinkEditor links={value} onChange={setValue} />;
   const configuration = {
+    certifications: {
+      label: "certification",
+      fresh: { name: "", issuer: "", dates: "", url: null, provenance: null },
+      fields: [
+        ["Certification", "name"],
+        ["Issuer", "issuer"],
+        ["Dates", "dates"],
+      ],
+    },
+    languages: {
+      label: "language",
+      fresh: { name: "", proficiency: "", provenance: null },
+      fields: [
+        ["Language", "name"],
+        ["Proficiency", "proficiency"],
+      ],
+    },
     employment: {
       label: "work experience",
       fresh: { title: "", company: "", dates: "", bullets: [] },
@@ -185,7 +205,15 @@ function SectionEditor({ section, value, setValue }) {
     </>
   );
 }
-export function Journal({ profile, onSave, canUse, busy, request, notify }) {
+export function Journal({
+  profile,
+  onSave,
+  canUse,
+  busy,
+  request,
+  notify,
+  onAcceptProposal,
+}) {
   const [draft, setDraft] = useState(() => structuredClone(profile));
   const [editing, setEditing] = useState(null),
     [value, setValue] = useState(null),
@@ -205,8 +233,9 @@ export function Journal({ profile, onSave, canUse, busy, request, notify }) {
               headline: draft.headline,
               email: draft.email,
               phone: draft.phone,
+              location: draft.location || "",
             }
-          : draft[section],
+          : draft[section] || [],
       ),
     );
   }
@@ -299,6 +328,16 @@ export function Journal({ profile, onSave, canUse, busy, request, notify }) {
             "education",
           )}
           {row("Professional summary", draft.summary, "summary")}
+          {row(
+            "Certifications",
+            (draft.certifications || []).map((x) => x.name).join(" · "),
+            "certifications",
+          )}
+          {row(
+            "Languages",
+            (draft.languages || []).map((x) => x.name).join(" · "),
+            "languages",
+          )}
         </div>
         <div className="page">
           <h2>✦ Skills & Treasures</h2>
@@ -375,7 +414,7 @@ export function Journal({ profile, onSave, canUse, busy, request, notify }) {
         </div>
         <p className="muted">
           {canUse
-            ? "Saved privately through the authenticated API. Local demo stores data on this machine."
+            ? "Saved in this browser after approval. Export backups to keep a separate copy."
             : "Sign in to save your journal securely."}
         </p>
       </div>
@@ -435,6 +474,11 @@ export function Journal({ profile, onSave, canUse, busy, request, notify }) {
             Nothing has been applied. Check every proposed fact before
             accepting.
           </p>
+          {proposal.warnings?.map((warning, i) => (
+            <p className="note" key={i}>
+              {warning}
+            </p>
+          ))}
           {profileChanges(draft, proposal).map((key) => (
             <div className="proposal-diff" key={key}>
               <h3>{key}</h3>
@@ -459,7 +503,9 @@ export function Journal({ profile, onSave, canUse, busy, request, notify }) {
           <div className="actions">
             <PixelButton
               onClick={() => {
-                setDraft({ ...proposal, confirmed: false });
+                onAcceptProposal?.();
+                const { warnings, ...proposed } = proposal;
+                setDraft({ ...proposed, confirmed: false });
                 setProposal(null);
                 notify(
                   "Proposal applied to your draft. Review, confirm, and save your profile.",

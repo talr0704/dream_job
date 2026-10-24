@@ -11,7 +11,7 @@ export function ResumePreview({ resume, twoPages, onLayout }) {
   );
   function measure() {
     const iframe = frame.current;
-    if (!iframe?.contentDocument.querySelector(".paper")) return;
+    if (!iframe?.contentDocument?.querySelector(".paper")) return;
     const layout = iframe.contentWindow.Function(
       "return (" + fitPaper.toString() + ")()",
     )();
@@ -151,8 +151,10 @@ export function Builder({
   onSaveVersion,
   sourceJob,
   concise,
+  onRefine,
   go,
 }) {
+  const [instructions, setInstructions] = useState("");
   const [editing, setEditing] = useState(false),
     [layout, setLayout] = useState(null),
     [title, setTitle] = useState(""),
@@ -191,6 +193,18 @@ export function Builder({
               <p className="source-job">{sourceJob}</p>
             </details>
           )}
+          <Field
+            label="Requested resume edits"
+            value={instructions}
+            multiline
+            onChange={setInstructions}
+          />
+          <PixelButton
+            disabled={!!busy || instructions.trim().length < 3}
+            onClick={() => onRefine(instructions)}
+          >
+            Refine with AI
+          </PixelButton>
           <hr />
           <h2>Keep this version</h2>
           <Field
@@ -265,7 +279,7 @@ export function Builder({
               }
               onClick={() => download(resume, twoPages)}
             >
-              {busy === "Rendering PDF…" ? busy : "Download PDF ↓"}
+              {busy === "Rendering PDF…" ? busy : "Export PDF ↓"}
             </PixelButton>
           </div>
           <p className="export-note">
