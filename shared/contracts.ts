@@ -1,4 +1,10 @@
 import { z } from "zod";
+import { integerSchema } from "./validation.js";
+// Zod 3 accepted both minute-precision and second/fractional UTC timestamps.
+export const timestampSchema = z.union([
+  z.iso.datetime(),
+  z.iso.datetime({ precision: -1 }),
+]);
 const text = z.string().trim().max(3000);
 const nonempty = text.min(1);
 const id = z.string().min(1).max(120);
@@ -72,7 +78,7 @@ const language = z
 export const professionalProfileSchema = z
   .object({
     id,
-    version: z.number().int().positive(),
+    version: integerSchema.positive(),
     verified: z.boolean(),
     personal: z
       .object({
@@ -95,7 +101,7 @@ export const professionalProfileSchema = z
     languages: z.array(language).max(30),
     achievements: z.array(fact).max(30),
     links: z.array(link).max(10),
-    updatedAt: z.string().datetime(),
+    updatedAt: timestampSchema,
   })
   .strict()
   .superRefine((p, ctx) => {
