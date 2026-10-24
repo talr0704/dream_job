@@ -150,3 +150,5 @@ The deployment and same-origin build scripts invoke npm's JavaScript CLI through
 Regression checks cover Windows-style CLI paths and literal metacharacters, real installed npm/Wrangler CLI subprocesses, validation ordering and failure/cancellation. The subprocess portability workflow runs the focused checks on Windows, macOS and Linux with Node 24; local execution in this cloud workspace tests Linux only. No Cloudflare configuration or secret changes are part of this portability fix.
 
 Dependency audit remediation and Zod 4 compatibility details are documented in [docs/dependency-security.md](docs/dependency-security.md). The full audit includes development tooling; run `npm ci` followed by `npm audit` to reproduce.
+
+Extraction error flow, safe diagnostics, error codes and the limits of the production investigation are documented in [docs/extraction-investigation.md](docs/extraction-investigation.md). Report the displayed request reference and safe diagnostic metadata when investigating failures; never share resume text, raw model output, credentials or headers.

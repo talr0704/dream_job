@@ -4,14 +4,23 @@ import {
   type ApiInput,
   type ApiOutput,
 } from "../../shared/contracts";
+function safeRequestId(value: unknown): string | undefined {
+  return typeof value === "string" &&
+    /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(
+      value,
+    )
+    ? value
+    : undefined;
+}
 export class ClientError extends Error {
   constructor(
     public code: string,
     message: string,
     public status = 0,
     public retryAfter?: number,
+    public requestId?: string,
   ) {
-    super(message);
+    super(message + (requestId ? ` Reference: ${requestId}` : ""));
   }
 }
 export class DreamJobClient {
@@ -79,6 +88,8 @@ export class DreamJobClient {
           data.error?.message || "API request failed.",
           response.status,
           Number(response.headers.get("Retry-After")) || undefined,
+          safeRequestId(data.error?.requestId) ||
+            safeRequestId(response.headers.get("X-Request-ID")),
         );
       const output = endpoints[endpoint].response.safeParse(data);
       if (!output.success)

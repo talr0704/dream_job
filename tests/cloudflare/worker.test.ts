@@ -214,7 +214,8 @@ it("fails closed for missing configuration, unavailable usage protection and mod
     authenticate: identity,
     fetcher,
   }).fetch(input.clone(), env);
-  expect(response.status).toBe(502);
+  expect(response.status).toBe(422);
+  expect(((await response.json()) as any).error.code).toBe("AI_REFUSED");
 });
 it("rejects unsupported extracted structure and forged resume facts before saving anything", async () => {
   const fetcher = vi

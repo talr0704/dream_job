@@ -13,13 +13,17 @@ export const urlSchema = z
   .max(2000)
   .url()
   .refine((v) => {
-    const u = new URL(v);
-    return (
-      u.protocol === "https:" &&
-      !u.username &&
-      !u.password &&
-      !/^(localhost|127\.|\[::1\])/.test(u.hostname)
-    );
+    try {
+      const u = new URL(v);
+      return (
+        u.protocol === "https:" &&
+        !u.username &&
+        !u.password &&
+        !/^(localhost|127\.|\[::1\])/.test(u.hostname)
+      );
+    } catch {
+      return false;
+    }
   }, "Use a public HTTPS URL without credentials");
 const provenance = z
   .object({ source: z.enum(["manual", "document", "legacy"]), quote: text })
@@ -236,7 +240,9 @@ export const extractRequestSchema = z
   .strict();
 export const extractResponseSchema = z
   .object({
-    profile: professionalProfileSchema.refine((p) => !p.verified),
+    profile: professionalProfileSchema.safeExtend({
+      verified: z.literal(false),
+    }),
     warnings: z.array(nonempty).max(50),
   })
   .strict();

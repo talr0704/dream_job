@@ -242,3 +242,70 @@ test("approved world remains responsive, and local PDF has A4 searchable text, l
   );
   expect((await page.evaluate(fitPaper)).overflow).toBe(true);
 });
+test("invalid extraction responses preserve an already approved profile and its versions", async ({
+  page,
+}) => {
+  await mockAPI(page);
+  await approve(page);
+  const before = await page.evaluate(async () => {
+    const { db } = await import("/src/lib/storage.ts");
+    return {
+      profiles: await db.professionalProfiles.toArray(),
+      versions: await db.profileVersions.toArray(),
+      resumes: await db.resumes.toArray(),
+    };
+  });
+  await page
+    .locator(".import-panel")
+    .evaluate((el) => el.setAttribute("open", ""));
+  const input =
+    "New information must survive the failed extraction without changing my approved profile.";
+  const requestId = "12345678-1234-4123-8123-123456789abc";
+  for (const invalid of [false, true]) {
+    await page.route("**/api/extract-profile", (route) =>
+      route.fulfill({
+        status: invalid ? 200 : 502,
+        contentType: "application/json",
+        body: JSON.stringify(
+          invalid
+            ? { profile: {}, warnings: [] }
+            : {
+                error: {
+                  code: "INVALID_AI_RESPONSE",
+                  message:
+                    "AI output failed validation. No changes were saved.",
+                  requestId,
+                },
+              },
+        ),
+      }),
+    );
+    await page
+      .getByLabel("Professional information or updates", { exact: true })
+      .fill(input);
+    await page
+      .getByRole("button", { name: "Propose profile updates", exact: true })
+      .click();
+    await expect(page.getByRole("alert")).toContainText(
+      invalid ? "response did not match" : "Reference: " + requestId,
+    );
+    await expect(
+      page.getByLabel("Professional information or updates", { exact: true }),
+    ).toHaveValue(input);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    const after = await page.evaluate(async () => {
+      const { db } = await import("/src/lib/storage.ts");
+      return {
+        profiles: await db.professionalProfiles.toArray(),
+        versions: await db.profileVersions.toArray(),
+        resumes: await db.resumes.toArray(),
+      };
+    });
+    expect(after).toEqual(before);
+  }
+  await page.reload();
+  await expect(
+    page.getByText("✓ Confirmed profile", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Alex Example", { exact: true })).toBeVisible();
+});
