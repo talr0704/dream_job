@@ -15,6 +15,14 @@ import {
   type AIEnv,
 } from "./ai";
 import { ApiError } from "./errors";
+import {
+  recordFailure,
+  safeIssues,
+  schemaFields,
+  type DiagnosticContext,
+  type DiagnosticEvent,
+} from "./diagnostics";
+import { structuredSchema } from "./ai";
 export interface Env extends AccessConfig, AIEnv {
   ALLOWED_ORIGIN: string;
   AI_RATE_LIMITER?: {
@@ -80,11 +88,21 @@ async function readBody(request: Request, signal: AbortSignal) {
   }
 }
 export function createWorker(
-  deps: { fetcher?: typeof fetch; authenticate?: typeof verifyAccess } = {},
+  deps: {
+    fetcher?: typeof fetch;
+    authenticate?: typeof verifyAccess;
+    log?: (event: DiagnosticEvent) => void;
+  } = {},
 ) {
   return {
     async fetch(request: Request, env: Env): Promise<Response> {
       const requestId = crypto.randomUUID();
+      const context: DiagnosticContext = {
+        requestId,
+        endpoint: "unknown",
+        operation: "request",
+        log: deps.log || ((event) => console.warn(JSON.stringify(event))),
+      };
       const origin = request.headers.get("Origin");
       const headers: Record<string, string> = {
         "Content-Type": "application/json; charset=utf-8",
@@ -148,6 +166,7 @@ export function createWorker(
           path !== `/api/${endpoint}`
         )
           throw new ApiError("NOT_FOUND", "Endpoint not found.", 404);
+        context.endpoint = endpoint;
         if (request.method === "OPTIONS") {
           if (
             !origin ||
@@ -232,6 +251,7 @@ export function createWorker(
         const fetcher = deps.fetcher || fetch;
         let output: unknown;
         if (endpoint === "extract-profile") {
+          context.operation = "extract";
           const extracted = await structured(
             env,
             extractionSchema,
@@ -239,8 +259,16 @@ export function createWorker(
             input,
             controller.signal,
             fetcher,
+            context,
           );
-          await audit(env, input, extracted, controller.signal, fetcher);
+          await audit(
+            env,
+            input,
+            extracted,
+            controller.signal,
+            fetcher,
+            context,
+          );
           extracted.profile = {
             ...extracted.profile,
             id: crypto.randomUUID(),
@@ -248,13 +276,15 @@ export function createWorker(
             verified: false,
             updatedAt: new Date().toISOString(),
           };
-          for (const [key, value] of Object.entries(extracted.profile.personal))
-            if (!value)
-              extracted.warnings.push(
-                `Missing ${key}; review before approval.`,
-              );
+          const missing = Object.entries(extracted.profile.personal)
+            .filter(([, value]) => !value)
+            .map(([key]) => `Missing ${key}; review before approval.`);
+          extracted.warnings = [
+            ...new Set([...extracted.warnings, ...missing]),
+          ].slice(0, 50);
           output = extracted;
         } else if (endpoint === "analyze-job") {
+          context.operation = "analyze";
           const draft = await structured(
             env,
             analysisDraftSchema,
@@ -262,10 +292,13 @@ export function createWorker(
             { ...input, ...factsFor(input.profile) },
             controller.signal,
             fetcher,
+            context,
           );
           output = validateAnalysis(draft, input.profile);
-          await audit(env, input, output, controller.signal, fetcher);
+          await audit(env, input, output, controller.signal, fetcher, context);
         } else {
+          context.operation =
+            endpoint === "generate-resume" ? "generate" : "refine";
           if (endpoint === "generate-resume") {
             const { score, ...draft } = input.analysis;
             const checked = validateAnalysis(draft, input.profile);
@@ -285,11 +318,29 @@ export function createWorker(
             { ...input, ...factsFor(input.profile) },
             controller.signal,
             fetcher,
+            context,
           );
           output = validateResume(draft, input.profile);
-          await audit(env, input, output, controller.signal, fetcher);
+          await audit(env, input, output, controller.signal, fetcher, context);
         }
-        return reply(endpoints[endpoint].response.parse(output));
+        const final = endpoints[endpoint].response.safeParse(output);
+        if (!final.success) {
+          recordFailure(
+            context,
+            "response_validation",
+            "INVALID_AI_RESPONSE",
+            safeIssues(
+              final.error,
+              schemaFields(structuredSchema(endpoints[endpoint].response)),
+            ),
+          );
+          throw new ApiError(
+            "INVALID_AI_RESPONSE",
+            "AI output failed final validation. No changes were saved.",
+            502,
+          );
+        }
+        return reply(final.data);
       } catch (error) {
         const e =
           error instanceof ApiError
@@ -305,6 +356,7 @@ export function createWorker(
                   "The request could not be completed safely.",
                   502,
                 );
+        recordFailure(context, "request", e.code);
         if (e.retryAfter) headers["Retry-After"] = String(e.retryAfter);
         return reply(
           { error: { code: e.code, message: e.message, requestId } },
