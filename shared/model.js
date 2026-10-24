@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { integerSchema } from "./validation.js";
 export const safeURL = z
   .string()
   .max(2000)
@@ -18,7 +19,7 @@ export const safeURL = z
   }, "Use a real HTTPS link without credentials");
 const text = z.string().trim().min(1).max(3000);
 const link = z.object({ label: text, url: safeURL }).strict();
-export const profileSchema = z
+export const profileObjectSchema = z
   .object({
     confirmed: z.boolean(),
     location: z.string().max(3000).optional(),
@@ -31,7 +32,7 @@ export const profileSchema = z
             issuer: z.string().max(3000),
             dates: z.string().max(3000),
             url: safeURL.nullable(),
-            provenance: z.unknown().nullable(),
+            provenance: z.unknown().nullable().optional(),
           })
           .strict(),
       )
@@ -44,7 +45,7 @@ export const profileSchema = z
             id: z.string(),
             name: z.string().max(3000),
             proficiency: z.string().max(3000),
-            provenance: z.unknown().nullable(),
+            provenance: z.unknown().nullable().optional(),
           })
           .strict(),
       )
@@ -91,12 +92,12 @@ export const profileSchema = z
       .max(10),
     achievements: z.array(text).max(30),
   })
-  .strict()
-  .superRefine((p, c) => {
-    for (const key of ["employment", "projects", "education"])
-      if (new Set(p[key].map((x) => x.id)).size !== p[key].length)
-        c.addIssue({ code: "custom", message: `Duplicate ${key} IDs` });
-  });
+  .strict();
+export const profileSchema = profileObjectSchema.superRefine((p, c) => {
+  for (const key of ["employment", "projects", "education"])
+    if (new Set(p[key].map((x) => x.id)).size !== p[key].length)
+      c.addIssue({ code: "custom", message: `Duplicate ${key} IDs` });
+});
 const strings = z.array(text).max(30);
 export const resultSchema = z
   .object({
@@ -132,7 +133,7 @@ export const resultSchema = z
                 bullets: z
                   .array(
                     z
-                      .object({ sourceIndex: z.number().int().min(0), text })
+                      .object({ sourceIndex: integerSchema.min(0), text })
                       .strict(),
                   )
                   .max(20),

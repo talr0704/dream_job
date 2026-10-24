@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { profileSchema, resultSchema } from "./model.js";
+import { profileSchema, profileObjectSchema, resultSchema } from "./model.js";
 export const emptyProfile = {
   confirmed: false,
   location: "",
@@ -17,10 +17,10 @@ export const emptyProfile = {
   education: [],
   achievements: [],
 };
-const base = profileSchema.innerType();
+const base = profileObjectSchema;
 const blank = z.string().max(3000);
 // Incomplete facts are valid drafts; generation/export still require the stricter schema.
-export const profileDraftObject = profileSchema.innerType().extend({
+export const profileDraftObject = profileObjectSchema.extend({
   employment: z
     .array(
       base.shape.employment.element.extend({

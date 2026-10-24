@@ -3,6 +3,7 @@ import Dexie, { type Table } from "dexie";
 import { z } from "zod";
 import {
   professionalProfileSchema,
+  timestampSchema,
   verifiedProfileSchema,
   analysisSchema,
   tailoredResumeSchema,
@@ -16,7 +17,7 @@ export const savedAnalysisSchema = z
     profile: verifiedProfileSchema,
     jobDescription: z.string().min(40).max(18000),
     analysis: analysisSchema,
-    createdAt: z.string().datetime(),
+    createdAt: timestampSchema,
   })
   .strict();
 export const savedResumeSchema = z
@@ -29,7 +30,7 @@ export const savedResumeSchema = z
     jobDescription: z.string().max(18000),
     analysis: analysisSchema.nullable(),
     twoPages: z.boolean(),
-    createdAt: z.string().datetime(),
+    createdAt: timestampSchema,
     manualProfile: profileSchema
       .refine((p) => p.confirmed, "Confirm manual snapshot facts")
       .nullable(),
@@ -40,14 +41,16 @@ export const backupSchema = z
   .object({
     format: z.literal("dream-job"),
     version: z.literal(1),
-    exportedAt: z.string().datetime(),
+    exportedAt: timestampSchema,
     professionalProfiles: z.array(verifiedProfileSchema).max(100),
     profileVersions: z.array(verifiedProfileSchema).max(10000),
     jobAnalyses: z.array(savedAnalysisSchema).max(10000),
     resumes: z.array(savedResumeSchema).max(10000),
     settings: z
       .array(
-        z.object({ key: z.string().max(100), value: z.unknown() }).strict(),
+        z
+          .object({ key: z.string().max(100), value: z.unknown().optional() })
+          .strict(),
       )
       .max(100),
   })
