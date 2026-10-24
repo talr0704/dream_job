@@ -25,6 +25,43 @@ export const urlSchema = z
       return false;
     }
   }, "Use a public HTTPS URL without credentials");
+// Extraction accepts only an actual, supplied personal LinkedIn profile URL.
+// This validator never repairs a URL or derives one from a person's name.
+export const extractedLinkedinSchema = urlSchema.refine((value) => {
+  try {
+    const u = new URL(value);
+    if (
+      !(
+        u.hostname === "linkedin.com" || u.hostname.endsWith(".linkedin.com")
+      ) ||
+      u.port
+    )
+      return false;
+    const match = /^\/(?:in|pub)\/([^/]+)(?:\/.*)?$/.exec(u.pathname);
+    if (!match) return false;
+    const slug = decodeURIComponent(match[1]).toLowerCase();
+    return !new Set([
+      "your-name",
+      "yourname",
+      "your-profile",
+      "your-linkedin",
+      "your-linkedin-profile",
+      "username",
+      "placeholder",
+      "example",
+      "profile-url",
+      "<name>",
+      "[name]",
+    ]).has(slug);
+  } catch {
+    return false;
+  }
+}, "Use a supplied LinkedIn personal profile URL");
+export const extractedLinkedinField = extractedLinkedinSchema
+  .nullable()
+  .describe(
+    "Optional LinkedIn personal profile URL. Copy an exact supplied HTTPS linkedin.com/in/ or linkedin.com/pub/ URL. Use null when absent, invalid, a placeholder, or not LinkedIn. Never infer, repair, or fabricate a URL.",
+  );
 const provenance = z
   .object({ source: z.enum(["manual", "document", "legacy"]), quote: text })
   .strict();
@@ -242,6 +279,9 @@ export const extractResponseSchema = z
   .object({
     profile: professionalProfileSchema.safeExtend({
       verified: z.literal(false),
+      personal: professionalProfileSchema.shape.personal.extend({
+        linkedin: extractedLinkedinField,
+      }),
     }),
     warnings: z.array(nonempty).max(50),
   })

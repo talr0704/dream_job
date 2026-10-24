@@ -56,3 +56,7 @@ The deployment-to-source mapping is now supplied by the user, not inferred. At t
 For this request signature, the POST/method gate, Access/input/quota rejection paths, initial fetch failure/non-2xx response paths, schema-generation exceptions in the request-building expression, timeout branch, final API-response validation and a supported=false factuality verdict have different error codes or messages. They cannot explain this exact signature in the confirmed source. This is control-flow evidence; it does not supply the actual provider finish reason, refusal flag, response payload or validation path.
 
 PR #7 implemented the diagnostics and consistency fixes and was subsequently merged. It did not deploy them. This provenance update changes the confidence of the source attribution, not the remaining uncertainty about the private response that triggered the catch. The synthetic reproductions already used the now-confirmed deployed commit. No weaker validator, guessed repair, automatic retry or automatic deployment is warranted by the additional metadata.
+
+## Subsequent confirmed LinkedIn failure
+
+Later production diagnostics for a separate failing extraction identified `profile.personal.linkedin` with `invalid_format` and `custom` issues after provider HTTP 200, `finishReason:stop`, and no refusal. That specific failure is now attributable to optional LinkedIn URL validation; see [the scoped fix](linkedin-extraction.md). This new evidence does not retroactively identify the trigger for the earlier request that lacked internal diagnostics.

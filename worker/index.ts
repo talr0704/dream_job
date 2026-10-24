@@ -15,6 +15,7 @@ import {
   type AIEnv,
 } from "./ai";
 import { ApiError } from "./errors";
+import { linkedinReviewWarning } from "./extraction";
 import {
   recordFailure,
   safeIssues,
@@ -280,7 +281,13 @@ export function createWorker(
             .filter(([, value]) => !value)
             .map(([key]) => `Missing ${key}; review before approval.`);
           extracted.warnings = [
-            ...new Set([...extracted.warnings, ...missing]),
+            ...new Set([
+              ...(extracted.profile.personal.linkedin === null
+                ? [linkedinReviewWarning]
+                : []),
+              ...extracted.warnings,
+              ...missing,
+            ]),
           ].slice(0, 50);
           output = extracted;
         } else if (endpoint === "analyze-job") {
