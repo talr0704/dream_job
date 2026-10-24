@@ -14,7 +14,9 @@
     "test:ui": "playwright test",
     "worker:dev": "wrangler dev --local",
     "worker:check": "wrangler deploy --dry-run --outdir work/worker-build",
-    "worker:deploy": "node scripts/deploy-worker.mjs"
+    "worker:deploy": "node scripts/deploy-worker.mjs",
+    "build:same-origin": "node scripts/build-same-origin.mjs",
+    "worker:check:same-origin": "wrangler deploy --dry-run --config wrangler.same-origin.jsonc --outdir work/same-origin-build"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.3.0",
@@ -22,6 +24,7 @@
     "@sparticuz/chromium": "^153.0.0",
     "@vitejs/plugin-react": "latest",
     "dexie": "^4.4.7",
+    "fflate": "^0.8.3",
     "jose": "^6.2.13",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.4.299",
@@ -30,8 +33,7 @@
     "react-dom": "latest",
     "vite": "latest",
     "zod": "^3.24.0",
-    "zod-to-json-schema": "^3.25.2",
-    "fflate": "^0.8.3"
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261024.1",
@@ -39,6 +41,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "fake-indexeddb": "^6.2.6",
+    "jsonc-parser": "^3.3.1",
     "prettier": "^3.9.10",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5",

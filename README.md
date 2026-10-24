@@ -94,7 +94,7 @@ The deployment wrapper refuses missing configuration/different Worker names, rer
 
 For GitHub Pages, set the public Actions variable `VITE_API_URL` to the API origin, configure Settings → Pages → GitHub Actions, then manually run the workflow with `publish_frontend=true` only when frontend publication is approved. This does not resolve the cross-site Access constraint above.
 
-For the separately approved **same-origin alternative**, copy the actual non-secret vars to `wrangler.same-origin.jsonc`, build with empty `VITE_API_URL` and `/` base, review the static asset policy and run `npm run worker:deploy -- --same-origin` only after approval. The wrapper builds with those same-origin values and selects the alternate config. Do not switch configurations without exporting the current browser's data first.
+For the separately approved **same-origin alternative**, reuse the existing configured Access bindings (do not add blank overrides), build with empty `VITE_API_URL` and `/` base, review the static asset policy and run `npm run worker:deploy -- --same-origin` only after approval. The wrapper builds with those same-origin values and selects the alternate config. Do not switch configurations without exporting the current browser's data first.
 
 ## Source map and practical limits
 
@@ -111,3 +111,34 @@ PDF export opens the approved document and uses the browser's **Save as PDF** di
 ## Recorded local validation
 
 The final local validation completed successfully: 26 mocked Vitest tests; 7 retained model/renderer regression tests; 3 Chromium PDF integration tests; 4 Playwright browser workflows; strict TypeScript/Vite production build; API-only and optional same-origin Wrangler dry-run bundles. The local workerd smoke test returned 204 for the allowed preflight, 401 without an Access JWT, and 403 for a wrong origin. Approved source HTML, template CSS and pixel-world CSS have no changes. No paid model request, real Access login, production rate-limit provisioning, frontend publication or Worker deployment was performed.
+
+## Same-origin production preparation
+
+Production frontend and API origin: **https://dream-job-api.tal070498.workers.dev**. Use the existing `wrangler.same-origin.jsonc`, whose Worker name is `dream-job-api`; API requests under `/api/*` run Worker code first and other requests serve `dist/` static assets. No new Worker or route/domain registration is configured.
+
+This config sets `ALLOWED_ORIGIN` to the production origin. It reuses the `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` already configured in `wrangler.jsonc` on main. `keep_vars:true` also preserves unrelated dashboard variables. It does not declare or replace `OPENAI_API_KEY`. The workspace has no Cloudflare credentials, so the live bindings, Worker ownership/account and Access policy cannot be independently checked here. Before an approved deploy, confirm those two existing Access bindings are present and nonempty in the existing Worker's settings. Never replace them with test values. Preserve Access All traffic protection, account-member Allow policy and preview protection. No Access bypass or policy mutation is performed by these scripts. Local workerd tests do not emulate the Cloudflare Access edge.
+
+Preparation commands (no deployment):
+
+```sh
+npm run build:same-origin
+npm run worker:check:same-origin
+node scripts/deploy-worker.mjs --same-origin --print-plan
+node scripts/check-same-origin.mjs
+```
+
+`build:same-origin` explicitly overrides inherited Vite settings to `VITE_API_URL=''` and `VITE_BASE_PATH='/'`. The built client therefore sends relative `/api/*` requests with credentials to the same origin. The deployment wrapper uses a JSONC-aware parser, selects this same build, and dry-runs **this same config** before any deployment prompt. The `--print-plan` command exits before running checks or deployment. Only after separate approval, `npm run worker:deploy -- --same-origin` reruns tests/build and the matching dry-run, then requires the explicit interactive deployment phrase. The original API-only configuration remains available for the existing architecture.
+
+### Back up browser data before changing origin
+
+1. Open the current app at its **old frontend origin** in the browser/profile where the data is stored. Open My Profile and choose **Export local backup**. Keep the downloaded `dream-job-backup-v1.json` securely; it contains personal information.
+2. Verify the JSON contains `format: "dream-job"`, `version: 1` and the expected profile/version, analysis and resume arrays. Keep a second safe copy. An older Firebase backend's data is not automatically included in an IndexedDB backup; migrate that data separately if still in use.
+3. After the separately approved same-origin deployment, sign in through Access at the new URL using the same browser. The new origin starts with a separate IndexedDB database; it cannot read the old origin's storage.
+4. In My Profile choose **Import backup**, select the downloaded file, check the counts and confirm. Import validates the backup and cancels the whole transaction on any ID collision; it never overwrites existing records. If conflicts occur, export the new origin's data too and resolve the conflict deliberately before retrying.
+5. Reopen the profile, profile history and saved resumes and verify their content. Retain the old origin's data and backup until you have confirmed the new copy. Clearing browser storage or changing browser profiles can remove local data.
+
+A GitHub Pages origin is shared by all repositories under the same hostname; the repository path is not a distinct IndexedDB origin. The workers.dev hostname above is a separate origin, so exporting and importing is required.
+
+Same-origin preparation validation: 27 Vitest tests, 7 regression tests, 3 PDF integration tests and 4 Playwright workflows passed. The same-origin production build and matching Wrangler dry-run passed (16 static files included). Local workerd served HTML and root JS/CSS assets with HTTP 200; unauthenticated API returned 401, unknown `/api/*` returned JSON 404 rather than SPA HTML, and a wrong origin returned 403. This verifies local routing, not the live Access edge or existing remote binding values. Nothing was deployed.
+
+The existing Access audience/team values were found in updated GitHub main and copied unchanged into the same-origin configuration. Tests assert that both configurations use the same Access application. Live Cloudflare policy/binding state has not been independently inspected.
