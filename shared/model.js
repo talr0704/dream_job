@@ -21,10 +21,39 @@ const link = z.object({ label: text, url: safeURL }).strict();
 export const profileSchema = z
   .object({
     confirmed: z.boolean(),
+    location: z.string().max(3000).optional(),
+    certifications: z
+      .array(
+        z
+          .object({
+            id: z.string(),
+            name: z.string().max(3000),
+            issuer: z.string().max(3000),
+            dates: z.string().max(3000),
+            url: safeURL.nullable(),
+            provenance: z.unknown().nullable(),
+          })
+          .strict(),
+      )
+      .max(30)
+      .optional(),
+    languages: z
+      .array(
+        z
+          .object({
+            id: z.string(),
+            name: z.string().max(3000),
+            proficiency: z.string().max(3000),
+            provenance: z.unknown().nullable(),
+          })
+          .strict(),
+      )
+      .max(30)
+      .optional(),
     name: text,
     headline: text,
     phone: z.string().max(80),
-    email: z.string().email(),
+    email: z.union([z.string().email(), z.literal("")]),
     links: z.array(link).max(10),
     summary: text,
     skills: z.array(text).min(1).max(100),

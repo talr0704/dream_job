@@ -6,6 +6,7 @@ export function Library({
   onDownload,
   onOrganize,
   onDelete,
+  onDuplicate,
   canUse,
   busy,
   go,
@@ -46,7 +47,7 @@ export function Library({
             )}
           </select>
         </label>
-        <p>{items.length} / 100 saved versions</p>
+        <p>{items.length} saved versions</p>
       </div>
       {!items.length ? (
         <div className="panel collection-empty">
@@ -100,6 +101,12 @@ export function Library({
                   }
                 >
                   Download PDF
+                </PixelButton>
+                <PixelButton
+                  disabled={!!busy}
+                  onClick={() => onDuplicate(item.id)}
+                >
+                  Duplicate
                 </PixelButton>
                 <button
                   className="edit"

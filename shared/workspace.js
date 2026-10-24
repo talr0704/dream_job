@@ -2,6 +2,9 @@ import { z } from "zod";
 import { profileSchema, resultSchema } from "./model.js";
 export const emptyProfile = {
   confirmed: false,
+  location: "",
+  certifications: [],
+  languages: [],
   name: "",
   headline: "",
   phone: "",

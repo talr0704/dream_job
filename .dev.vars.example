@@ -1,0 +1,7 @@
+# Copy to ignored .dev.vars for optional local Worker testing.
+# Never commit a real key. No real paid calls are used by automated tests.
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4.1-mini
+ALLOWED_ORIGIN=http://localhost:5173
+ACCESS_AUD=
+ACCESS_TEAM_DOMAIN=
