@@ -5,15 +5,15 @@
   "compatibility_date": "2026-10-01",
   "workers_dev": true,
   "preview_urls": true,
+  // Retain the existing dashboard Access bindings; never override them with blanks.
+  // OPENAI_API_KEY remains the existing Worker secret.
   "keep_vars": true,
   "observability": {
     "enabled": false,
   },
   "vars": {
     "OPENAI_MODEL": "gpt-4.1-mini",
-    "ALLOWED_ORIGIN": "",
-    "ACCESS_AUD": "",
-    "ACCESS_TEAM_DOMAIN": "",
+    "ALLOWED_ORIGIN": "https://dream-job-api.tal070498.workers.dev",
   },
   "ratelimits": [
     {
