@@ -9,9 +9,9 @@
   "observability": { "enabled": false },
   "vars": {
     "OPENAI_MODEL": "gpt-4.1-mini",
-    "ALLOWED_ORIGIN": "",
-    "ACCESS_AUD": "",
-    "ACCESS_TEAM_DOMAIN": "",
+    "ALLOWED_ORIGIN": "https://talr0704.github.io",
+    "ACCESS_AUD": "3d935a1b79768cce6a09e6425da1b75deef48446e252988b17dd2924b3ee2c94",
+    "ACCESS_TEAM_DOMAIN": "ancient-sun-7f49.cloudflareaccess.com",
   },
   "ratelimits": [
     {
