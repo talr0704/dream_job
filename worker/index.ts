@@ -4,7 +4,6 @@ import {
   type Endpoint,
   validateAnalysis,
   validateResume,
-  analysisDraftSchema,
 } from "../shared/contracts";
 import { verifyAccess, accessIssuer, type AccessConfig } from "./auth";
 import {
@@ -14,6 +13,7 @@ import {
   factsFor,
   type AIEnv,
 } from "./ai";
+import { analyzeJob } from "./job-analysis";
 import { ApiError } from "./errors";
 import { optionalUrlReviewWarnings } from "./extraction";
 import {
@@ -290,17 +290,13 @@ export function createWorker(
           output = extracted;
         } else if (endpoint === "analyze-job") {
           context.operation = "analyze";
-          const draft = await structured(
+          output = await analyzeJob(
             env,
-            analysisDraftSchema,
-            "Analyze job requirements; never return a score. mandatory=true weighs 3, preferred weighs 1. Cite existing facts for met/partial, use missing for no evidence.",
-            { ...input, ...factsFor(input.profile) },
+            input,
             controller.signal,
             fetcher,
             context,
           );
-          output = validateAnalysis(draft, input.profile);
-          await audit(env, input, output, controller.signal, fetcher, context);
         } else {
           context.operation =
             endpoint === "generate-resume" ? "generate" : "refine";

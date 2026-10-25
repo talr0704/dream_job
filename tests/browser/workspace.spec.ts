@@ -309,3 +309,59 @@ test("invalid extraction responses preserve an already approved profile and its 
   ).toBeVisible();
   await expect(page.getByText("Alex Example", { exact: true })).toBeVisible();
 });
+test("rejected job factuality audit preserves job input and saved data without generating a resume", async ({
+  page,
+}) => {
+  await mockAPI(page);
+  await approve(page);
+  const snapshot = () =>
+    page.evaluate(async () => {
+      const { db } = await import("/src/lib/storage.ts");
+      return {
+        profiles: await db.professionalProfiles.toArray(),
+        versions: await db.profileVersions.toArray(),
+        analyses: await db.jobAnalyses.toArray(),
+        resumes: await db.resumes.toArray(),
+      };
+    });
+  const before = await snapshot();
+  let generated = 0;
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/generate-resume")) generated++;
+  });
+  const requestId = "12345678-1234-4123-8123-123456789abc";
+  await page.route("**/api/analyze-job", (route) =>
+    route.fulfill({
+      status: 422,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: {
+          code: "UNSUPPORTED_CLAIM",
+          message:
+            "Factuality review rejected the job analysis. Review the source information and retry. No changes were saved.",
+          requestId,
+        },
+      }),
+    }),
+  );
+  await page.getByRole("button", { name: "Job Match", exact: true }).click();
+  const job =
+    "Looking for a TypeScript developer. AWS certification is preferred; compare only verified profile evidence.";
+  await page
+    .getByRole("textbox", { name: "Job description", exact: true })
+    .fill(job);
+  await page
+    .getByRole("button", { name: "✦ Analyze & Generate", exact: true })
+    .click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Reference: " + requestId,
+  );
+  await expect(
+    page.getByRole("textbox", { name: "Job description", exact: true }),
+  ).toHaveValue(job);
+  await expect(
+    page.getByRole("button", { name: "✦ Analyze & Generate", exact: true }),
+  ).toBeEnabled();
+  expect(await snapshot()).toEqual(before);
+  expect(generated).toBe(0);
+});
