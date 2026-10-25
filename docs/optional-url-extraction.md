@@ -1,5 +1,7 @@
 # Optional URL extraction boundary
 
+Historical PR #10 scope. [Project link extraction](project-link-extraction.md) documents the subsequent extraction-only exception for optional project link candidates; standalone link URLs remain strict.
+
 ## Production evidence and root cause
 
 Worker version `1c341475-c71f-4c65-9333-bec0a559f28b`, request `14521ab6-3624-4f71-9897-60ea29358ec1`, returned HTTP 502 with `INVALID_AI_RESPONSE`. The provider returned HTTP 200, `finishReason:stop`, `refused:false`; the extraction's `zod_validation` failed at `profile.personal.portfolio` with `invalid_format` and `custom`.

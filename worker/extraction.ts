@@ -1,5 +1,7 @@
 import {
   extractedOptionalUrlFields,
+  extractionCandidateSchema,
+  extractResponseSchema,
   type ProfessionalProfile,
 } from "../shared/contracts";
 
@@ -79,4 +81,58 @@ export function optionalUrlReviewWarnings(
         ]
       : []),
   ];
+}
+
+// Optional project link candidates are distinct from required standalone links.
+// First normalize only candidate URLs to null, preserving record shapes/fields.
+export function parseExtractedProfile(value: unknown) {
+  const normalized = normalizeExtractedOptionalUrls(value);
+  let candidate = normalized;
+  if (
+    record(normalized) &&
+    record(normalized.profile) &&
+    Array.isArray(normalized.profile.projects)
+  ) {
+    candidate = {
+      ...normalized,
+      profile: {
+        ...normalized.profile,
+        projects: normalized.profile.projects.map((project) => {
+          if (!record(project) || !Array.isArray(project.links)) return project;
+          return {
+            ...project,
+            links: project.links.map((link) =>
+              record(link)
+                ? {
+                    ...link,
+                    url: optionalUrl(
+                      link.url,
+                      extractedOptionalUrlFields.portfolio,
+                    ),
+                  }
+                : link,
+            ),
+          };
+        }),
+      },
+    };
+  }
+  const checked = extractionCandidateSchema.safeParse(candidate);
+  if (!checked.success) return checked;
+  const warnings: string[] = [];
+  const projects = checked.data.profile.projects.map((project, index) => {
+    const links = project.links.filter((link) => link.url !== null);
+    if (links.length !== project.links.length)
+      warnings.push(
+        `Project ${index + 1}: invalid or missing optional links were removed. Project facts were retained; review its links against your source before saving.`,
+      );
+    return { ...project, links };
+  });
+  // Revalidate the final response: no null URL escapes into the client/profile.
+  // Original warnings and candidate limits have already been validated above.
+  return extractResponseSchema.safeParse({
+    ...checked.data,
+    profile: { ...checked.data.profile, projects },
+    warnings: [...warnings, ...checked.data.warnings].slice(0, 50),
+  });
 }
