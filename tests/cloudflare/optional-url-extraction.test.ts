@@ -150,7 +150,7 @@ it("reproduces both confirmed portfolio validation codes before normalization", 
       .success,
   ).toBe(true);
 });
-it("keeps required URLs and every non-URL constraint strict, retaining all records for rejection", () => {
+it("keeps scalar URL normalization isolated from required URLs and other constraints", () => {
   const mutations: ((raw: any) => void)[] = [
     (r) => {
       delete r.profile.personal;

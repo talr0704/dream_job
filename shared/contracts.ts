@@ -158,7 +158,7 @@ const language = z
     provenance: provenance.nullable(),
   })
   .strict();
-export const professionalProfileSchema = z
+const professionalProfileObjectSchema = z
   .object({
     id,
     version: integerSchema.positive(),
@@ -186,25 +186,29 @@ export const professionalProfileSchema = z
     links: z.array(link).max(10),
     updatedAt: timestampSchema,
   })
-  .strict()
-  .superRefine((p, ctx) => {
-    const ids = allFactEntries(p).map(([key]) => key);
-    if (new Set(ids).size !== ids.length)
-      ctx.addIssue({
-        code: "custom",
-        message:
-          "Fact IDs must be unique, including reserved personal/headline/summary IDs",
-      });
-    if (
-      p.verified &&
-      (!p.personal.fullName || !p.summary || !p.headline || !p.skills.length)
-    )
-      ctx.addIssue({
-        code: "custom",
-        message: "Review name, headline, summary and skills before approval",
-      });
-  });
-export type ProfessionalProfile = z.infer<typeof professionalProfileSchema>;
+  .strict();
+export type ProfessionalProfile = z.infer<
+  typeof professionalProfileObjectSchema
+>;
+export const professionalProfileSchema =
+  professionalProfileObjectSchema.superRefine(checkProfile);
+function checkProfile(p: ProfessionalProfile, ctx: z.RefinementCtx) {
+  const ids = allFactEntries(p).map(([key]) => key);
+  if (new Set(ids).size !== ids.length)
+    ctx.addIssue({
+      code: "custom",
+      message:
+        "Fact IDs must be unique, including reserved personal/headline/summary IDs",
+    });
+  if (
+    p.verified &&
+    (!p.personal.fullName || !p.summary || !p.headline || !p.skills.length)
+  )
+    ctx.addIssue({
+      code: "custom",
+      message: "Review name, headline, summary and skills before approval",
+    });
+}
 export type Experience = z.infer<typeof experience>;
 export type Education = z.infer<typeof education>;
 export type Project = z.infer<typeof project>;
@@ -317,10 +321,24 @@ const jobDescription = z.string().trim().min(40).max(18000);
 export const extractRequestSchema = z
   .object({ text: z.string().trim().min(20).max(60000) })
   .strict();
+// Extraction preserves supplied project link labels verbatim. Canonical storage
+// retains its existing trimming behavior. Blank/overlong labels still fail.
+const extractedProjectLink = link.extend({
+  label: z
+    .string()
+    .min(1)
+    .max(3000)
+    .refine((v) => v.trim().length > 0, "Expected a nonempty label"),
+  url: extractedUrlSchema,
+});
+const extractedProject = project.extend({
+  links: z.array(extractedProjectLink).max(10),
+});
 export const extractResponseSchema = z
   .object({
     profile: professionalProfileSchema.safeExtend({
       verified: z.literal(false),
+      projects: z.array(extractedProject).max(10),
       personal: professionalProfileSchema.shape.personal.extend({
         linkedin: extractedOptionalUrlFields.linkedin,
         portfolio: extractedOptionalUrlFields.portfolio,
@@ -337,6 +355,38 @@ export const extractResponseSchema = z
     warnings: z.array(nonempty).max(50),
   })
   .strict();
+// Provider candidates may have an unusable optional project URL represented as
+// null. Validate every record and global fact ID before dropping such links.
+// The client/final response contract above still requires every retained URL.
+export const extractionCandidateSchema = extractResponseSchema.extend({
+  profile: z
+    .object({
+      ...extractResponseSchema.shape.profile.shape,
+      projects: z
+        .array(
+          project.extend({
+            links: z
+              .array(
+                extractedProjectLink.extend({
+                  url: extractedUrlSchema
+                    .nullable()
+                    .describe(
+                      "Optional project link candidate. Copy an exact supplied public HTTPS URL, or null when missing, malformed, a placeholder or unsupported. Prefer an empty links array when no valid URLs are supplied. Never infer, repair or fabricate URLs. Keep project facts outside links.",
+                    ),
+                }),
+              )
+              .max(10),
+          }),
+        )
+        .max(10),
+    })
+    .strict()
+    .superRefine((p, ctx) => {
+      // checkProfile walks fact IDs and required approval fields; it never parses
+      // URL values. Candidate null URLs are removed before final URL validation.
+      checkProfile(p as ProfessionalProfile, ctx);
+    }),
+});
 export const analyzeRequestSchema = z
   .object({
     profile: verifiedProfileSchema,
