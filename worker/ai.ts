@@ -128,10 +128,11 @@ export async function structured<T>(
   signal: AbortSignal,
   fetcher: typeof fetch = fetch,
   context?: DiagnosticContext,
+  providerSchema?: z.ZodTypeAny,
 ): Promise<T> {
   let jsonSchema: unknown;
   try {
-    jsonSchema = structuredSchema(schema);
+    jsonSchema = structuredSchema(providerSchema ?? schema);
   } catch {
     recordFailure(context, "schema_generation", "AI_SCHEMA_CONFIGURATION");
     throw new ApiError(

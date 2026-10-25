@@ -1,5 +1,7 @@
 # Job analysis factuality investigation
 
+PR #13 investigation. The subsequent [source reference contract investigation](analysis-source-reference-contract.md) documents the fifth-requirement failure, request-specific provider constraints and precise safe reference diagnostics.
+
 ## What the production evidence establishes
 
 Worker version `4759449e-34d1-4bbc-bdbf-e6ecb2cad18e`, request `22f612f3-66db-456c-b001-0a0ad6a22b8a`, returned HTTP 422 / `UNSUPPORTED_CLAIM` for `POST /api/analyze-job`. Reported provider status is 200; operation is `audit`, phase is `factuality`.

@@ -32,6 +32,17 @@ export interface DiagnosticEvent {
     | "other";
   issues?: { path: string; code: string }[];
   issueCount?: number;
+  sourceReferenceFailure?: {
+    reasons: (
+      | "unknown_fact_id"
+      | "match_without_evidence"
+      | "missing_status_with_references"
+    )[];
+    status: "met" | "partial" | "missing";
+    referenceCount: number;
+    unknownReferenceCount: number;
+    schemaMode: "enum" | "validated_string";
+  };
   factualitySource?: "application" | "model";
   factualityIssueCount?: number;
   factualityIssues?: { rule: string; path: string }[];
@@ -55,6 +66,7 @@ export function recordFailure(
     | "finishReason"
     | "issues"
     | "issueCount"
+    | "sourceReferenceFailure"
     | "factualitySource"
     | "factualityIssueCount"
     | "factualityIssues"
