@@ -25,9 +25,33 @@ export const urlSchema = z
       return false;
     }
   }, "Use a public HTTPS URL without credentials");
+// Extraction-only policy: retain accepted strings byte-for-byte; never repair them.
+// Explicit template markers and reserved documentation domains are not evidence.
+const extractedUrlSchema = urlSchema.refine((value) => {
+  try {
+    const u = new URL(value);
+    const host = u.hostname.toLowerCase();
+    if (
+      /^(?:.*\.)?(?:example\.(?:com|org|net)|invalid|localhost)$/.test(host) ||
+      host.endsWith(".invalid")
+    )
+      return false;
+    const decoded = decodeURIComponent(value);
+    return (
+      !/(?:<|\[|\{)(?:name|username|your-name|your-domain|your-url|url|website|portfolio|placeholder)(?:>|\]|\})/i.test(
+        decoded,
+      ) &&
+      !/(?:^|[/.])(?:placeholder|your-domain|your-website|your-portfolio|your-url)(?:[/.?#]|$)/i.test(
+        decoded,
+      )
+    );
+  } catch {
+    return false;
+  }
+}, "Use an exact supplied URL, not a placeholder");
 // Extraction accepts only an actual, supplied personal LinkedIn profile URL.
 // This validator never repairs a URL or derives one from a person's name.
-export const extractedLinkedinSchema = urlSchema.refine((value) => {
+export const extractedLinkedinSchema = extractedUrlSchema.refine((value) => {
   try {
     const u = new URL(value);
     if (
@@ -62,6 +86,24 @@ export const extractedLinkedinField = extractedLinkedinSchema
   .describe(
     "Optional LinkedIn personal profile URL. Copy an exact supplied HTTPS linkedin.com/in/ or linkedin.com/pub/ URL. Use null when absent, invalid, a placeholder, or not LinkedIn. Never infer, repair, or fabricate a URL.",
   );
+export const extractedOptionalUrlFields = {
+  linkedin: extractedLinkedinField,
+  portfolio: extractedUrlSchema
+    .nullable()
+    .describe(
+      "Optional portfolio URL. Copy an exact supplied public HTTPS URL without credentials. Use null when missing, malformed, a placeholder, or unsupported. Never infer, repair, or fabricate a URL.",
+    ),
+  github: extractedUrlSchema
+    .nullable()
+    .describe(
+      "Optional GitHub URL. Copy an exact supplied public HTTPS URL without credentials. Use null when missing, malformed, a placeholder, or unsupported. Never infer, repair, or fabricate a URL.",
+    ),
+  certification: extractedUrlSchema
+    .nullable()
+    .describe(
+      "Optional certification URL. Copy an exact supplied public HTTPS URL without credentials. Use null when missing, malformed, a placeholder, or unsupported. Preserve the certification record and facts. Never infer, repair, or fabricate a URL.",
+    ),
+} as const;
 const provenance = z
   .object({ source: z.enum(["manual", "document", "legacy"]), quote: text })
   .strict();
@@ -280,8 +322,17 @@ export const extractResponseSchema = z
     profile: professionalProfileSchema.safeExtend({
       verified: z.literal(false),
       personal: professionalProfileSchema.shape.personal.extend({
-        linkedin: extractedLinkedinField,
+        linkedin: extractedOptionalUrlFields.linkedin,
+        portfolio: extractedOptionalUrlFields.portfolio,
+        github: extractedOptionalUrlFields.github,
       }),
+      certifications: z
+        .array(
+          certification.extend({
+            url: extractedOptionalUrlFields.certification,
+          }),
+        )
+        .max(30),
     }),
     warnings: z.array(nonempty).max(50),
   })

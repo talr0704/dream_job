@@ -15,7 +15,7 @@ import {
   type AIEnv,
 } from "./ai";
 import { ApiError } from "./errors";
-import { linkedinReviewWarning } from "./extraction";
+import { optionalUrlReviewWarnings } from "./extraction";
 import {
   recordFailure,
   safeIssues,
@@ -282,9 +282,7 @@ export function createWorker(
             .map(([key]) => `Missing ${key}; review before approval.`);
           extracted.warnings = [
             ...new Set([
-              ...(extracted.profile.personal.linkedin === null
-                ? [linkedinReviewWarning]
-                : []),
+              ...optionalUrlReviewWarnings(extracted.profile),
               ...extracted.warnings,
               ...missing,
             ]),

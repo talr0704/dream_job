@@ -1,5 +1,7 @@
 # Optional LinkedIn extraction fix
 
+Historical PR #9 scope. The subsequent generalized boundary is documented in [Optional URL extraction](optional-url-extraction.md); portfolio, GitHub and certification URLs now receive extraction-only normalization too.
+
 ## Confirmed cause
 
 The new production diagnostics identify `operation:extract`, `phase:zod_validation`, provider HTTP 200, finish reason `stop`, no refusal, and two issues at `profile.personal.linkedin`: `invalid_format` and `custom`. This establishes that a non-null LinkedIn candidate failed the URL-format and custom public-HTTPS checks. It is not a method error, provider schema rejection, truncation, refusal or audit-call failure. The actual candidate was not supplied and must not be logged; it could be a missing-value string, placeholder or other malformed value. The regression uses a synthetic `N/A`, which reproduces those two issue codes without requiring the private response.
