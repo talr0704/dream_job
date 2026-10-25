@@ -1,0 +1,316 @@
+{
+  "sourceText": "Alex Synthetic; alex@synthetic.test. Software developer. Builds accessible applications with TypeScript and React. Developer at Synthetic Company, 2021-2024. Built 3 accessible applications. BSc, Synthetic College, 2020. TypeScript. React. Accessibility tool: built with TypeScript, React and keyboard navigation. Built a TypeScript and React tool with keyboard navigation. Delivered 3 integrations. Professional certificate, Synthetic Institute, 2024. English: Fluent. Mentored 2 colleagues. Source code: https://GitHub.com/alex-synthetic/tool?tab=readme#Overview . Professional writing: https://Writing.test/Alex?topic=Accessibility#Posts . Talks: https://talks.test/alex-synthetic . LinkedIn: N/A. Portfolio: not provided. GitHub: github.com/alex-synthetic. Certificate URL: N/A. Demo: N/A. Documentation: https://example.com/project . Other site: N/A. Missing destination: absent. Template: https://placeholder.invalid/profile .",
+  "candidate": {
+    "profile": {
+      "id": "synthetic-profile",
+      "version": 1,
+      "verified": false,
+      "personal": {
+        "fullName": "Alex Synthetic",
+        "email": "alex@synthetic.test",
+        "phone": "",
+        "location": "",
+        "linkedin": "N/A",
+        "portfolio": "not provided",
+        "github": "github.com/alex-synthetic"
+      },
+      "headline": "Software developer",
+      "summary": "Builds accessible applications with TypeScript and React.",
+      "experience": [
+        {
+          "id": "exp-1",
+          "title": "Developer",
+          "employer": "Synthetic Company",
+          "dates": "2021-2024",
+          "achievements": [
+            {
+              "id": "exp-ach-1",
+              "text": "Built 3 accessible applications.",
+              "provenance": {
+                "source": "document",
+                "quote": "Built 3 accessible applications."
+              }
+            }
+          ],
+          "provenance": {
+            "source": "document",
+            "quote": "Developer at Synthetic Company, 2021-2024."
+          }
+        }
+      ],
+      "education": [
+        {
+          "id": "edu-1",
+          "degree": "BSc",
+          "school": "Synthetic College",
+          "dates": "2020",
+          "provenance": {
+            "source": "document",
+            "quote": "BSc, Synthetic College, 2020."
+          }
+        }
+      ],
+      "skills": [
+        {
+          "id": "skill-1",
+          "text": "TypeScript",
+          "provenance": {
+            "source": "document",
+            "quote": "TypeScript"
+          }
+        },
+        {
+          "id": "skill-2",
+          "text": "React",
+          "provenance": {
+            "source": "document",
+            "quote": "React"
+          }
+        }
+      ],
+      "projects": [
+        {
+          "id": "project-1",
+          "name": "Accessibility tool",
+          "description": "Built a TypeScript and React tool with keyboard navigation.",
+          "achievements": [
+            {
+              "id": "project-ach-1",
+              "text": "Delivered 3 integrations.",
+              "provenance": {
+                "source": "document",
+                "quote": "Delivered 3 integrations."
+              }
+            }
+          ],
+          "links": [
+            {
+              "id": "project-link-valid",
+              "label": "  Source code  ",
+              "url": "https://GitHub.com/alex-synthetic/tool?tab=readme#Overview"
+            },
+            {
+              "id": "project-link-bad",
+              "label": "Demo",
+              "url": "N/A"
+            },
+            {
+              "id": "project-link-template",
+              "label": "Documentation",
+              "url": "https://example.com/project"
+            }
+          ],
+          "provenance": {
+            "source": "document",
+            "quote": "Accessibility tool: built with TypeScript, React and keyboard navigation."
+          }
+        }
+      ],
+      "certifications": [
+        {
+          "id": "cert-1",
+          "name": "Professional certificate",
+          "issuer": "Synthetic Institute",
+          "dates": "2024",
+          "url": "N/A",
+          "provenance": {
+            "source": "document",
+            "quote": "Professional certificate, Synthetic Institute, 2024."
+          }
+        }
+      ],
+      "languages": [
+        {
+          "id": "lang-1",
+          "name": "English",
+          "proficiency": "Fluent",
+          "provenance": {
+            "source": "document",
+            "quote": "English: Fluent."
+          }
+        }
+      ],
+      "achievements": [
+        {
+          "id": "achievement-1",
+          "text": "Mentored 2 colleagues.",
+          "provenance": {
+            "source": "document",
+            "quote": "Mentored 2 colleagues."
+          }
+        }
+      ],
+      "links": [
+        {
+          "id": "general-valid-1",
+          "label": "  Professional writing  ",
+          "url": "https://Writing.test/Alex?topic=Accessibility#Posts"
+        },
+        {
+          "id": "general-bad",
+          "label": "Other site",
+          "url": "N/A"
+        },
+        {
+          "id": "general-missing",
+          "label": "Missing destination"
+        },
+        {
+          "id": "general-template",
+          "label": "Template",
+          "url": "https://placeholder.invalid/profile"
+        },
+        {
+          "id": "general-valid-2",
+          "label": "Talks",
+          "url": "https://talks.test/alex-synthetic"
+        }
+      ],
+      "updatedAt": "2026-10-25T00:00:00.000Z"
+    },
+    "warnings": []
+  },
+  "expectedProfile": {
+    "id": "synthetic-profile",
+    "version": 1,
+    "verified": false,
+    "personal": {
+      "fullName": "Alex Synthetic",
+      "email": "alex@synthetic.test",
+      "phone": "",
+      "location": "",
+      "linkedin": null,
+      "portfolio": null,
+      "github": null
+    },
+    "headline": "Software developer",
+    "summary": "Builds accessible applications with TypeScript and React.",
+    "experience": [
+      {
+        "id": "exp-1",
+        "title": "Developer",
+        "employer": "Synthetic Company",
+        "dates": "2021-2024",
+        "achievements": [
+          {
+            "id": "exp-ach-1",
+            "text": "Built 3 accessible applications.",
+            "provenance": {
+              "source": "document",
+              "quote": "Built 3 accessible applications."
+            }
+          }
+        ],
+        "provenance": {
+          "source": "document",
+          "quote": "Developer at Synthetic Company, 2021-2024."
+        }
+      }
+    ],
+    "education": [
+      {
+        "id": "edu-1",
+        "degree": "BSc",
+        "school": "Synthetic College",
+        "dates": "2020",
+        "provenance": {
+          "source": "document",
+          "quote": "BSc, Synthetic College, 2020."
+        }
+      }
+    ],
+    "skills": [
+      {
+        "id": "skill-1",
+        "text": "TypeScript",
+        "provenance": {
+          "source": "document",
+          "quote": "TypeScript"
+        }
+      },
+      {
+        "id": "skill-2",
+        "text": "React",
+        "provenance": {
+          "source": "document",
+          "quote": "React"
+        }
+      }
+    ],
+    "projects": [
+      {
+        "id": "project-1",
+        "name": "Accessibility tool",
+        "description": "Built a TypeScript and React tool with keyboard navigation.",
+        "achievements": [
+          {
+            "id": "project-ach-1",
+            "text": "Delivered 3 integrations.",
+            "provenance": {
+              "source": "document",
+              "quote": "Delivered 3 integrations."
+            }
+          }
+        ],
+        "links": [
+          {
+            "id": "project-link-valid",
+            "label": "  Source code  ",
+            "url": "https://GitHub.com/alex-synthetic/tool?tab=readme#Overview"
+          }
+        ],
+        "provenance": {
+          "source": "document",
+          "quote": "Accessibility tool: built with TypeScript, React and keyboard navigation."
+        }
+      }
+    ],
+    "certifications": [
+      {
+        "id": "cert-1",
+        "name": "Professional certificate",
+        "issuer": "Synthetic Institute",
+        "dates": "2024",
+        "url": null,
+        "provenance": {
+          "source": "document",
+          "quote": "Professional certificate, Synthetic Institute, 2024."
+        }
+      }
+    ],
+    "languages": [
+      {
+        "id": "lang-1",
+        "name": "English",
+        "proficiency": "Fluent",
+        "provenance": {
+          "source": "document",
+          "quote": "English: Fluent."
+        }
+      }
+    ],
+    "achievements": [
+      {
+        "id": "achievement-1",
+        "text": "Mentored 2 colleagues.",
+        "provenance": {
+          "source": "document",
+          "quote": "Mentored 2 colleagues."
+        }
+      }
+    ],
+    "links": [
+      {
+        "id": "general-valid-1",
+        "label": "  Professional writing  ",
+        "url": "https://Writing.test/Alex?topic=Accessibility#Posts"
+      },
+      {
+        "id": "general-valid-2",
+        "label": "Talks",
+        "url": "https://talks.test/alex-synthetic"
+      }
+    ],
+    "updatedAt": "2026-10-25T00:00:00.000Z"
+  }
+}

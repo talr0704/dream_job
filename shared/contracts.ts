@@ -321,9 +321,9 @@ const jobDescription = z.string().trim().min(40).max(18000);
 export const extractRequestSchema = z
   .object({ text: z.string().trim().min(20).max(60000) })
   .strict();
-// Extraction preserves supplied project link labels verbatim. Canonical storage
+// Extraction preserves supplied link labels verbatim. Canonical storage
 // retains its existing trimming behavior. Blank/overlong labels still fail.
-const extractedProjectLink = link.extend({
+const extractedLink = link.extend({
   label: z
     .string()
     .min(1)
@@ -331,14 +331,22 @@ const extractedProjectLink = link.extend({
     .refine((v) => v.trim().length > 0, "Expected a nonempty label"),
   url: extractedUrlSchema,
 });
+export const extractedLinkCandidateSchema = extractedLink.extend({
+  url: extractedUrlSchema
+    .nullable()
+    .describe(
+      "Optional link candidate. Copy an exact supplied public HTTPS URL, or null when missing, malformed, a placeholder or unsupported. Prefer an empty links array when no valid URLs are supplied. Never infer, repair or fabricate URLs. Keep professional facts outside link labels.",
+    ),
+});
 const extractedProject = project.extend({
-  links: z.array(extractedProjectLink).max(10),
+  links: z.array(extractedLink).max(10),
 });
 export const extractResponseSchema = z
   .object({
     profile: professionalProfileSchema.safeExtend({
       verified: z.literal(false),
       projects: z.array(extractedProject).max(10),
+      links: z.array(extractedLink).max(10),
       personal: professionalProfileSchema.shape.personal.extend({
         linkedin: extractedOptionalUrlFields.linkedin,
         portfolio: extractedOptionalUrlFields.portfolio,
@@ -355,27 +363,18 @@ export const extractResponseSchema = z
     warnings: z.array(nonempty).max(50),
   })
   .strict();
-// Provider candidates may have an unusable optional project URL represented as
+// Provider candidates may have an unusable optional link URL represented as
 // null. Validate every record and global fact ID before dropping such links.
 // The client/final response contract above still requires every retained URL.
 export const extractionCandidateSchema = extractResponseSchema.extend({
   profile: z
     .object({
       ...extractResponseSchema.shape.profile.shape,
+      links: z.array(extractedLinkCandidateSchema).max(10),
       projects: z
         .array(
           project.extend({
-            links: z
-              .array(
-                extractedProjectLink.extend({
-                  url: extractedUrlSchema
-                    .nullable()
-                    .describe(
-                      "Optional project link candidate. Copy an exact supplied public HTTPS URL, or null when missing, malformed, a placeholder or unsupported. Prefer an empty links array when no valid URLs are supplied. Never infer, repair or fabricate URLs. Keep project facts outside links.",
-                    ),
-                }),
-              )
-              .max(10),
+            links: z.array(extractedLinkCandidateSchema).max(10),
           }),
         )
         .max(10),

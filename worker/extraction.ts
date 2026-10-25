@@ -1,6 +1,7 @@
 import {
   extractedOptionalUrlFields,
   extractionCandidateSchema,
+  extractedLinkCandidateSchema,
   extractResponseSchema,
   type ProfessionalProfile,
 } from "../shared/contracts";
@@ -83,43 +84,58 @@ export function optionalUrlReviewWarnings(
   ];
 }
 
-// Optional project link candidates are distinct from required standalone links.
-// First normalize only candidate URLs to null, preserving record shapes/fields.
+// Both optional link collections share one URL policy. Missing containers and
+// invalid non-URL fields remain untouched for candidate validation below.
+function normalizeLinkCandidates(value: unknown): unknown {
+  if (!Array.isArray(value)) return value;
+  return value.map((link) =>
+    record(link)
+      ? {
+          ...link,
+          url: extractedLinkCandidateSchema.shape.url.safeParse(link.url)
+            .success
+            ? link.url
+            : null,
+        }
+      : link,
+  );
+}
 export function parseExtractedProfile(value: unknown) {
   const normalized = normalizeExtractedOptionalUrls(value);
   let candidate = normalized;
-  if (
-    record(normalized) &&
-    record(normalized.profile) &&
-    Array.isArray(normalized.profile.projects)
-  ) {
+  if (record(normalized) && record(normalized.profile)) {
+    const profile = normalized.profile;
     candidate = {
       ...normalized,
       profile: {
-        ...normalized.profile,
-        projects: normalized.profile.projects.map((project) => {
-          if (!record(project) || !Array.isArray(project.links)) return project;
-          return {
-            ...project,
-            links: project.links.map((link) =>
-              record(link)
-                ? {
-                    ...link,
-                    url: optionalUrl(
-                      link.url,
-                      extractedOptionalUrlFields.portfolio,
-                    ),
-                  }
-                : link,
-            ),
-          };
-        }),
+        ...profile,
+        // Do not manufacture required arrays/properties when absent.
+        ...(Object.hasOwn(profile, "links")
+          ? { links: normalizeLinkCandidates(profile.links) }
+          : {}),
+        ...(Array.isArray(profile.projects)
+          ? {
+              projects: profile.projects.map((project) =>
+                record(project) && Object.hasOwn(project, "links")
+                  ? {
+                      ...project,
+                      links: normalizeLinkCandidates(project.links),
+                    }
+                  : project,
+              ),
+            }
+          : {}),
       },
     };
   }
   const checked = extractionCandidateSchema.safeParse(candidate);
   if (!checked.success) return checked;
   const warnings: string[] = [];
+  const links = checked.data.profile.links.filter((link) => link.url !== null);
+  if (links.length !== checked.data.profile.links.length)
+    warnings.push(
+      "General profile links: invalid or missing optional link candidates were removed. Review links against your source before saving.",
+    );
   const projects = checked.data.profile.projects.map((project, index) => {
     const links = project.links.filter((link) => link.url !== null);
     if (links.length !== project.links.length)
@@ -132,7 +148,7 @@ export function parseExtractedProfile(value: unknown) {
   // Original warnings and candidate limits have already been validated above.
   return extractResponseSchema.safeParse({
     ...checked.data,
-    profile: { ...checked.data.profile, projects },
+    profile: { ...checked.data.profile, projects, links },
     warnings: [...warnings, ...checked.data.warnings].slice(0, 50),
   });
 }

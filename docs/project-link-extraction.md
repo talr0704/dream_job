@@ -1,5 +1,7 @@
 # Project link extraction boundary
 
+Historical PR #11 scope. The subsequent [complete extraction contract audit](extraction-contract-audit.md) extends the same candidate handling to general profile links; canonical saved-profile rules remain strict.
+
 ## Confirmed production failure
 
 Worker version `cce4f5c0-937c-4446-a955-fe4e7b14ac84`, request `f8e3d864-5fa3-48d0-95bc-b1b1bdfa2d2c`, failed `POST /api/extract-profile` with `INVALID_AI_RESPONSE` during `zod_validation`. The provider returned HTTP 200 with `finishReason:stop`; ten reported issues at `profile.projects.[].links.[].url` alternate between `invalid_format` and `custom`.
