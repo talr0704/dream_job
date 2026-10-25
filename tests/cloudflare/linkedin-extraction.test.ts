@@ -5,7 +5,7 @@ import {
   professionalProfileSchema,
 } from "../../shared/contracts";
 import {
-  normalizeExtractedLinkedin,
+  normalizeExtractedOptionalUrls,
   linkedinReviewWarning,
 } from "../../worker/extraction";
 import {
@@ -68,14 +68,16 @@ it("reproduces the confirmed two-issue production field rejection before normali
         .map((i) => i.code),
     ).toEqual(["invalid_format", "custom"]);
   const parsed = extractResponseSchema.parse(
-    normalizeExtractedLinkedin(output("N/A")),
+    normalizeExtractedOptionalUrls(output("N/A")),
   );
   expect(parsed.profile.personal.linkedin).toBeNull();
 });
 it.each(valid)("preserves valid supplied LinkedIn URL exactly: %s", (url) => {
   const raw = output(url);
   const before = structuredClone(raw);
-  const parsed = extractResponseSchema.parse(normalizeExtractedLinkedin(raw));
+  const parsed = extractResponseSchema.parse(
+    normalizeExtractedOptionalUrls(raw),
+  );
   expect(parsed.profile.personal.linkedin).toBe(url);
   expect(raw).toEqual(before);
   expect(parsed.profile.verified).toBe(false);
@@ -84,7 +86,7 @@ it.each(invalid.map((value, index) => ({ value, index })))(
   "clears missing/invalid LinkedIn case $index without changing any other fields",
   ({ value }) => {
     const raw = output(value);
-    const normalized: any = normalizeExtractedLinkedin(raw);
+    const normalized: any = normalizeExtractedOptionalUrls(raw);
     const parsed = extractResponseSchema.parse(normalized);
     expect(parsed.profile.personal).toEqual({
       ...profile.personal,
@@ -99,17 +101,15 @@ it.each(invalid.map((value, index) => ({ value, index })))(
     );
   },
 );
-it.each(["email", "portfolio", "github", "fullName"])(
-  "does not relax validation for %s",
-  (field) => {
-    const raw = output("N/A");
-    (raw.profile.personal as any)[field] =
-      field === "fullName" ? 123 : "not valid";
-    expect(
-      extractResponseSchema.safeParse(normalizeExtractedLinkedin(raw)).success,
-    ).toBe(false);
-  },
-);
+it.each(["email", "fullName"])("does not relax validation for %s", (field) => {
+  const raw = output("N/A");
+  (raw.profile.personal as any)[field] =
+    field === "fullName" ? 123 : "not valid";
+  expect(
+    extractResponseSchema.safeParse(normalizeExtractedOptionalUrls(raw))
+      .success,
+  ).toBe(false);
+});
 it("keeps invalid facts, duplicate IDs, malformed warnings and verification flags rejected", () => {
   for (const raw of [
     { ...output("N/A"), profile: { ...output("N/A").profile, verified: true } },
@@ -125,7 +125,8 @@ it("keeps invalid facts, duplicate IDs, malformed warnings and verification flag
     { ...output("N/A"), unexpected: true },
   ])
     expect(
-      extractResponseSchema.safeParse(normalizeExtractedLinkedin(raw)).success,
+      extractResponseSchema.safeParse(normalizeExtractedOptionalUrls(raw))
+        .success,
     ).toBe(false);
 });
 it("uses the shared nullable field contract and an explicit null/no-fabrication extraction prompt", async () => {

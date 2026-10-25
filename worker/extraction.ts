@@ -1,26 +1,82 @@
-import { extractedLinkedinField } from "../shared/contracts";
-export const linkedinReviewWarning =
-  "LinkedIn URL was missing or invalid and was left blank. Review it before saving.";
-// Only the extraction boundary tolerates an omitted/invalid optional LinkedIn.
-// Copy the object: all other fields (including warnings) go through unchanged.
-export function normalizeExtractedLinkedin(value: unknown): unknown {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
-  const root = value as Record<string, unknown>;
-  const profile = root.profile;
-  if (!profile || typeof profile !== "object" || Array.isArray(profile))
-    return value;
-  const p = profile as Record<string, unknown>;
-  const personal = p.personal;
-  if (!personal || typeof personal !== "object" || Array.isArray(personal))
-    return value;
-  const person = personal as Record<string, unknown>;
-  const linkedin = person.linkedin;
-  const valid = extractedLinkedinField.safeParse(linkedin).success;
+import {
+  extractedOptionalUrlFields,
+  type ProfessionalProfile,
+} from "../shared/contracts";
+
+function record(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+function optionalUrl(
+  value: unknown,
+  schema: (typeof extractedOptionalUrlFields)[keyof typeof extractedOptionalUrlFields],
+): unknown {
+  return schema.safeParse(value).success ? value : null;
+}
+// Only the AI extraction boundary is tolerant. Never mutate input, coerce other
+// fields, remove records, or create missing containers: full validation follows.
+export function normalizeExtractedOptionalUrls(value: unknown): unknown {
+  if (!record(value) || !record(value.profile)) return value;
+  const profile = value.profile;
+  const personal = profile.personal;
   return {
-    ...root,
+    ...value,
     profile: {
-      ...p,
-      personal: { ...person, linkedin: valid ? linkedin : null },
+      ...profile,
+      ...(record(personal)
+        ? {
+            personal: {
+              ...personal,
+              ...Object.fromEntries(
+                (["linkedin", "portfolio", "github"] as const).map((key) => [
+                  key,
+                  optionalUrl(personal[key], extractedOptionalUrlFields[key]),
+                ]),
+              ),
+            },
+          }
+        : {}),
+      ...(Array.isArray(profile.certifications)
+        ? {
+            certifications: profile.certifications.map((cert) =>
+              record(cert)
+                ? {
+                    ...cert,
+                    url: optionalUrl(
+                      cert.url,
+                      extractedOptionalUrlFields.certification,
+                    ),
+                  }
+                : cert,
+            ),
+          }
+        : {}),
     },
   };
+}
+export const linkedinReviewWarning =
+  "LinkedIn URL was missing or invalid and was left blank. Review it before saving.";
+// Static field names only, never rejected values, record names, IDs or quotes.
+// Aggregate certification warnings so every optional location fits within the
+// response's warning limit even with the maximum number of certification records.
+export function optionalUrlReviewWarnings(
+  profile: ProfessionalProfile,
+): string[] {
+  return [
+    ...(profile.personal.linkedin === null ? [linkedinReviewWarning] : []),
+    ...(profile.personal.portfolio === null
+      ? [
+          "Portfolio URL was missing or invalid and was left blank. Review it before saving.",
+        ]
+      : []),
+    ...(profile.personal.github === null
+      ? [
+          "GitHub URL was missing or invalid and was left blank. Review it before saving.",
+        ]
+      : []),
+    ...(profile.certifications.some((cert) => cert.url === null)
+      ? [
+          "One or more certification URLs were missing or invalid and were left blank. Certification facts were retained; review their URLs against your source before saving.",
+        ]
+      : []),
+  ];
 }
