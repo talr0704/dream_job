@@ -11,7 +11,7 @@ import { structuredSchema, assertStructuredSchema } from "../../worker/ai";
 import { createWorker } from "../../worker/index";
 import { DreamJobDB } from "../../src/lib/storage";
 import { DreamJobClient } from "../../src/lib/api";
-import { profile, env, identity, mockAI } from "./fixtures";
+import { profile, env, identity, mockAI, auditWithStatuses } from "./fixtures";
 const jobDescription =
   "Required: TypeScript. Preferred: AWS certification. Responsibilities include accessible application development.";
 function draft(status = "met", ids = ["skill-1"]) {
@@ -49,7 +49,7 @@ function setup(
   const fetcher = vi
     .fn()
     .mockResolvedValueOnce(mockAI(raw))
-    .mockResolvedValueOnce(mockAI(verdict));
+    .mockResolvedValueOnce(mockAI(auditWithStatuses(raw, verdict)));
   const log = vi.fn();
   const worker = createWorker({ authenticate: identity, fetcher, log });
   const request = (p: unknown = profile) =>

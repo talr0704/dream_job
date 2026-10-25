@@ -9,6 +9,7 @@ export type Phase =
   | "zod_validation"
   | "validation_exception"
   | "response_validation"
+  | "assessment_review"
   | "factuality"
   | "request";
 export interface DiagnosticEvent {
@@ -32,6 +33,29 @@ export interface DiagnosticEvent {
     | "other";
   issues?: { path: string; code: string }[];
   issueCount?: number;
+  assessmentReview?: {
+    policyVersion: "evidence-alignment-v1";
+    attempt: 0 | 1;
+    revisionEligible: boolean;
+    statusDisagreementCount: number;
+    evidenceDeficiencyCount: number;
+    assessments: {
+      index: number;
+      proposedStatus: "met" | "partial" | "missing";
+      reviewedStatus: "met" | "partial" | "missing";
+      basis: "direct" | "subset" | "transferable" | "none" | "ambiguous";
+      reason:
+        | "direct_evidence"
+        | "incomplete_coverage"
+        | "transferable_alignment"
+        | "no_supporting_evidence"
+        | "ambiguous_job_scope"
+        | "citation_not_entailing"
+        | "credential_not_evidenced"
+        | "duration_not_evidenced";
+      referenceCount: number;
+    }[];
+  };
   sourceReferenceFailure?: {
     reasons: (
       | "unknown_fact_id"
@@ -66,6 +90,7 @@ export function recordFailure(
     | "finishReason"
     | "issues"
     | "issueCount"
+    | "assessmentReview"
     | "sourceReferenceFailure"
     | "factualitySource"
     | "factualityIssueCount"

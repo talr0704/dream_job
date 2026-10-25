@@ -14,7 +14,7 @@ import {
   jobAnalysisInstruction,
 } from "../../worker/job-analysis";
 import { structuredSchema, assertStructuredSchema } from "../../worker/ai";
-import { profile, env, identity, mockAI } from "./fixtures";
+import { profile, env, identity, mockAI, auditWithStatuses } from "./fixtures";
 const jobDescription =
   "Backend developer. Required: TypeScript and accessible application development. Required: AWS certification. Preferred: Python. Preferred: 5 years of distributed systems experience. Responsibilities: collaborate with product and engineering.";
 const input = {
@@ -89,7 +89,7 @@ function setup(value: unknown = draft(), audit: unknown = supported) {
   const fetcher = vi
     .fn()
     .mockResolvedValueOnce(mockAI(value))
-    .mockResolvedValueOnce(mockAI(audit));
+    .mockResolvedValueOnce(mockAI(auditWithStatuses(value, audit)));
   const log = vi.fn();
   const w = createWorker({ authenticate: identity, fetcher, log });
   const request = (data: unknown = input) =>
@@ -545,12 +545,14 @@ it("logger failures never allow a failed audit to pass", async () => {
     .fn()
     .mockResolvedValueOnce(mockAI(draft()))
     .mockResolvedValueOnce(
-      mockAI({
-        supported: false,
-        violations: [
-          { rule: "missing_evidence_as_absence", field: "gaps", index: 0 },
-        ],
-      }),
+      mockAI(
+        auditWithStatuses(draft(), {
+          supported: false,
+          violations: [
+            { rule: "missing_evidence_as_absence", field: "gaps", index: 0 },
+          ],
+        }),
+      ),
     );
   const w = createWorker({
     authenticate: identity,
