@@ -102,8 +102,16 @@ it("extracts unapproved drafts, returns warnings for missing data and audits out
 it("computes the score and returns grounded analysis after an independent audit", async () => {
   const fetcher = vi
     .fn()
-    .mockResolvedValueOnce(mockAI(analysisDraft))
-    .mockResolvedValueOnce(mockAI({ supported: true, reasons: [] }));
+    .mockResolvedValueOnce(
+      mockAI({
+        ...analysisDraft,
+        requirements: analysisDraft.requirements.map((r) => ({
+          ...r,
+          jobDescriptionQuote: "TypeScript developer",
+        })),
+      }),
+    )
+    .mockResolvedValueOnce(mockAI({ supported: true, violations: [] }));
   const r = await createWorker({ authenticate: identity, fetcher }).fetch(
     request("analyze-job", {
       profile,

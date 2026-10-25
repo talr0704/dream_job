@@ -32,6 +32,9 @@ export interface DiagnosticEvent {
     | "other";
   issues?: { path: string; code: string }[];
   issueCount?: number;
+  factualitySource?: "application" | "model";
+  factualityIssueCount?: number;
+  factualityIssues?: { rule: string; path: string }[];
 }
 export interface DiagnosticContext {
   requestId: string;
@@ -52,6 +55,9 @@ export function recordFailure(
     | "finishReason"
     | "issues"
     | "issueCount"
+    | "factualitySource"
+    | "factualityIssueCount"
+    | "factualityIssues"
   > = {},
 ) {
   if (!context) return;
