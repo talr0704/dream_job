@@ -101,7 +101,7 @@ it.each([
     "zod_validation",
   ],
   [
-    "invalid required link URL",
+    "invalid link metadata",
     () =>
       envelope(
         JSON.stringify({
@@ -110,7 +110,7 @@ it.each([
             links: [
               {
                 id: "link-invalid",
-                label: "Professional site",
+                label: "",
                 url: "not a URL",
               },
             ],

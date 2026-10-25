@@ -194,7 +194,7 @@ it("validates non-URL facts, link metadata, duplicate IDs and original bounds be
       r.profile.verified = true;
     },
     (r) => {
-      r.profile.links = [link(8, "N/A")];
+      r.profile.links = [{ ...link(8, "N/A"), label: "" }];
     },
     (r) => {
       r.warnings = [""];
