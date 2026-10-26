@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { baseContent } from "../../shared/tailoring";
 import { profile, analysis, resume } from "../cloudflare/fixtures";
 import { resumeDocument, fitPaper } from "../../shared/render.js";
 import { toJournal } from "../../src/lib/adapter";
@@ -12,7 +13,9 @@ async function mockAPI(page: any) {
       ? { profile: draft, warnings: ["Review all facts."] }
       : path.endsWith("analyze-job")
         ? analysis
-        : resume;
+        : route.request().postDataJSON()?.formatVersion === 2
+          ? { formatVersion: 2, content: baseContent(profile), warnings: [] }
+          : resume;
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify(body),
@@ -55,14 +58,7 @@ test("review, approval, reload, match, immutable snapshots, duplicate, delete, b
       "Looking for a TypeScript developer with accessible application experience.",
     );
   await page
-    .getByRole("button", { name: "✦ Analyze & Generate", exact: true })
-    .click();
-  await expect(page.getByRole("progressbar")).toHaveAttribute(
-    "aria-valuenow",
-    "100",
-  );
-  await page
-    .getByRole("button", { name: "Open in CV Builder →", exact: true })
+    .getByRole("button", { name: "✦ Generate resume", exact: true })
     .click();
   await expect(
     page
@@ -90,9 +86,8 @@ test("review, approval, reload, match, immutable snapshots, duplicate, delete, b
     .click();
   await expect(page.locator(".resume-slot")).toHaveCount(1);
   await page.getByRole("button", { name: "Open & edit", exact: true }).click();
-  await page.getByRole("button", { name: "Edit resume", exact: true }).click();
   await page
-    .getByLabel("Summary", { exact: true })
+    .getByRole("textbox", { name: "Tailored summary", exact: true })
     .fill("Manually edited resume summary.");
   await page.getByLabel("Resume version name").fill("Manual version");
   await page
@@ -105,7 +100,7 @@ test("review, approval, reload, match, immutable snapshots, duplicate, delete, b
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export local backup" }).click();
   const file = await download;
-  expect(file.suggestedFilename()).toBe("dream-job-backup-v1.json");
+  expect(file.suggestedFilename()).toBe("dream-job-backup-v2.json");
   await page.getByRole("button", { name: "My Resumes", exact: true }).click();
   await page
     .getByRole("button", { name: "Open & edit", exact: true })
@@ -121,6 +116,9 @@ test("review, approval, reload, match, immutable snapshots, duplicate, delete, b
     };
   });
   const popupPromise = page.waitForEvent("popup");
+  await page
+    .getByLabel("I reviewed this tailored resume against the approved profile.")
+    .check();
   await page.getByRole("button", { name: "Export PDF ↓", exact: true }).click();
   const popup = await popupPromise;
   await expect(popup.locator("html")).toHaveAttribute("data-printed", "yes");
@@ -351,7 +349,7 @@ test("rejected job factuality audit preserves job input and saved data without g
     .getByRole("textbox", { name: "Job description", exact: true })
     .fill(job);
   await page
-    .getByRole("button", { name: "✦ Analyze & Generate", exact: true })
+    .getByRole("button", { name: "Analyze fit (optional)", exact: true })
     .click();
   await expect(page.getByRole("alert")).toContainText(
     "Reference: " + requestId,
@@ -360,15 +358,19 @@ test("rejected job factuality audit preserves job input and saved data without g
     page.getByRole("textbox", { name: "Job description", exact: true }),
   ).toHaveValue(job);
   await expect(
-    page.getByRole("button", { name: "✦ Analyze & Generate", exact: true }),
+    page.getByRole("button", { name: "Analyze fit (optional)", exact: true }),
   ).toBeEnabled();
   expect(await snapshot()).toEqual(before);
   expect(generated).toBe(0);
 });
-test("audited assessment revisions are visible and saved without changing the approved profile", async ({
+test("one-call tailoring is independent, source-comparable and requires fresh resume review after edits", async ({
   page,
 }) => {
   await mockAPI(page);
+  let analysisCalls = 0;
+  page.on("request", (r) => {
+    if (r.url().endsWith("/api/analyze-job")) analysisCalls++;
+  });
   await approve(page);
   const before = await page.evaluate(async () => {
     const { db } = await import("/src/lib/storage.ts");
@@ -377,52 +379,79 @@ test("audited assessment revisions are visible and saved without changing the ap
       versions: await db.profileVersions.toArray(),
     };
   });
-  const notice =
-    "Evidence review revised 1 requirement assessment: 1 met to partial. Review their evidence before using this analysis.";
-  const revised = {
-    ...analysis,
-    score: 50,
-    requirements: analysis.requirements.map((r) => ({
-      ...r,
-      status: "partial",
-      evidence: "TypeScript is evidenced; Python is not evidenced.",
-    })),
-    experienceAlignment: analysis.experienceAlignment + "\n" + notice,
-  };
-  await page.route("**/api/analyze-job", (route) =>
+  const content = baseContent(profile);
+  content.experience[0].bullets[0].text =
+    "Developed 3 accessible applications.";
+  await page.route("**/api/generate-resume", (route) =>
     route.fulfill({
       contentType: "application/json",
-      body: JSON.stringify(revised),
+      body: JSON.stringify({ formatVersion: 2, content, warnings: [] }),
     }),
   );
   await page.getByRole("button", { name: "Job Match", exact: true }).click();
   await page
     .getByRole("textbox", { name: "Job description", exact: true })
     .fill(
-      "Required: TypeScript and Python application development experience.",
+      "Seeking TypeScript and accessible application development experience.",
     );
   await page
-    .getByRole("button", { name: "✦ Analyze & Generate", exact: true })
+    .getByRole("button", { name: "✦ Generate resume", exact: true })
     .click();
-  await expect(page.getByRole("progressbar")).toHaveAttribute(
-    "aria-valuenow",
-    "50",
-  );
+  const review = page.getByRole("region", { name: "Review tailored resume" });
+  await expect(review).toBeVisible();
   await expect(
-    page.getByText(revised.experienceAlignment, { exact: true }),
-  ).toBeVisible();
+    review.locator("p").filter({ hasText: "Original approved achievement:" }),
+  ).toContainText("Built 3 accessible applications.");
+  await expect(
+    page.getByRole("textbox", { name: "Experience 1 bullet 1", exact: true }),
+  ).toHaveValue("Developed 3 accessible applications.");
+  expect(analysisCalls).toBe(0);
+  const exportButton = page.getByRole("button", {
+    name: "Export PDF ↓",
+    exact: true,
+  });
+  await expect(exportButton).toBeDisabled();
+  const approval = page.getByLabel(
+    "I reviewed this tailored resume against the approved profile.",
+  );
+  await approval.check();
+  await expect(exportButton).toBeEnabled();
+  await page
+    .getByRole("textbox", { name: "Tailored summary", exact: true })
+    .fill("Builds accessible applications with TypeScript.");
+  await expect(approval).not.toBeChecked();
+  await expect(exportButton).toBeDisabled();
+  await page
+    .getByRole("textbox", { name: "Experience 1 bullet 1", exact: true })
+    .fill("Led 100 projects.");
+  await approval.click();
+  await expect(page.getByRole("alert")).toContainText(
+    "failed focused factuality checks",
+  );
+  await expect(exportButton).toBeDisabled();
+  await page
+    .getByRole("textbox", { name: "Experience 1 bullet 1", exact: true })
+    .fill("Developed 3 accessible applications.");
+  await approval.check();
+  await expect(exportButton).toBeEnabled();
+  await page.getByLabel("Resume version name").fill("Reviewed tailoring");
+  await page
+    .getByRole("button", { name: "▣ Save new version", exact: true })
+    .click();
+  await page.getByRole("button", { name: "My Resumes", exact: true }).click();
+  await page.getByRole("button", { name: "Open & edit", exact: true }).click();
+  await expect(approval).toBeChecked();
   const after = await page.evaluate(async () => {
     const { db } = await import("/src/lib/storage.ts");
     return {
       profiles: await db.professionalProfiles.toArray(),
       versions: await db.profileVersions.toArray(),
-      analyses: await db.jobAnalyses.toArray(),
+      resumes: await db.resumes.toArray(),
     };
   });
   expect({ profiles: after.profiles, versions: after.versions }).toEqual(
     before,
   );
-  expect(after.analyses).toHaveLength(1);
-  expect(after.analyses[0].analysis.score).toBe(50);
-  expect(after.analyses[0].analysis.experienceAlignment).toContain(notice);
+  expect(after.resumes[0].formatVersion).toBe(2);
+  expect(after.resumes[0].review.digest).toMatch(/^[a-f0-9]{64}$/);
 });
