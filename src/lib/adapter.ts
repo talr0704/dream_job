@@ -1,6 +1,7 @@
 import {
   professionalProfileSchema,
   validateResume,
+  allFactEntries,
   type ProfessionalProfile,
   type TailoredResume,
   type JobAnalysis,
@@ -230,6 +231,33 @@ export function resumeToJournal(
 export function displayAnalysis(a: JobAnalysis, p: ProfessionalProfile): any {
   return {
     ...a,
+    requirements: a.requirements.map((r) => ({
+      ...r,
+      evidence:
+        r.evidence +
+        (r.sourceFactIds.length
+          ? " Approved source: " +
+            r.sourceFactIds
+              .map((id) => {
+                const fact = new Map(allFactEntries(p)).get(id) || "";
+                try {
+                  const record = JSON.parse(fact);
+                  return Object.entries(record)
+                    .filter(
+                      ([key, value]) =>
+                        key !== "id" &&
+                        key !== "provenance" &&
+                        typeof value === "string",
+                    )
+                    .map(([, value]) => value)
+                    .join(" · ");
+                } catch {
+                  return fact;
+                }
+              })
+              .join("; ")
+          : ""),
+    })),
     relevantSkills: p.skills
       .filter((s) => a.requirements.some((r) => r.sourceFactIds.includes(s.id)))
       .map((s) => s.text),

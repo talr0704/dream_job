@@ -90,31 +90,3 @@ export function mockAI(output: unknown) {
     { headers: { "Content-Type": "application/json" } },
   );
 }
-
-// Synthetic reviewer verdict completion for legacy API/enforcement regressions.
-// Realistic disagreement/repair fixtures specify independent reviews explicitly.
-export function auditWithStatuses(
-  draft: any,
-  verdict: any = { supported: true, violations: [] },
-) {
-  return {
-    statusReviews: draft.requirements.map((r: any, index: number) => ({
-      index,
-      status: r.status,
-      basis:
-        r.status === "met"
-          ? "direct"
-          : r.status === "partial"
-            ? "subset"
-            : "none",
-      reason:
-        r.status === "met"
-          ? "direct_evidence"
-          : r.status === "partial"
-            ? "incomplete_coverage"
-            : "no_supporting_evidence",
-      sourceFactIds: [...r.sourceFactIds],
-    })),
-    ...verdict,
-  };
-}

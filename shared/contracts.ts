@@ -424,6 +424,17 @@ export const extractionCandidateSchema = extractResponseSchema.extend({
       checkProfile(p as ProfessionalProfile, ctx);
     }),
 });
+// The provider produces professional data, not application-owned approval metadata.
+const {
+  id: profileId,
+  version: profileVersion,
+  verified: profileVerified,
+  updatedAt: profileUpdatedAt,
+  ...extractedProfessionalFields
+} = extractionCandidateSchema.shape.profile.shape;
+export const extractionProviderSchema = extractionCandidateSchema.extend({
+  profile: z.object(extractedProfessionalFields).strict(),
+});
 export const analyzeRequestSchema = z
   .object({
     profile: verifiedProfileSchema,

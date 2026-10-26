@@ -273,15 +273,7 @@ it("returns retained facts and bounded privacy-safe warnings through audit/clien
     expect(request.messages[0].content).toContain(
       "never infer, repair, or fabricate any URL",
     );
-    const audit = JSON.parse(
-      JSON.parse(fetcher.mock.calls[1][1].body).messages[1].content,
-    );
-    expect(audit.output.profile.certifications).toEqual(
-      draft().profile.certifications,
-    );
-    expect(JSON.stringify(audit.output)).not.toContain(
-      "private-invalid-url-marker",
-    );
+    expect(fetcher).toHaveBeenCalledTimes(1);
     expect(await db.professionalProfiles.toArray()).toEqual(before);
     expect(await db.profileVersions.count()).toBe(1);
     expect(log).not.toHaveBeenCalled();
@@ -289,7 +281,7 @@ it("returns retained facts and bounded privacy-safe warnings through audit/clien
     await db.delete();
   }
 });
-it("never bypasses factuality review after optional URL normalization", async () => {
+it("keeps normalized extraction unapproved for user review with one call", async () => {
   const raw = draft();
   setUrl(raw, "portfolio", "N/A");
   const fetcher = vi
@@ -313,8 +305,9 @@ it("never bypasses factuality review after optional URL normalization", async ()
     }),
     env,
   );
-  expect(response.status).toBe(422);
-  expect(((await response.json()) as any).error.code).toBe("UNSUPPORTED_CLAIM");
+  expect(response.status).toBe(200);
+  expect(((await response.json()) as any).profile.verified).toBe(false);
+  expect(fetcher).toHaveBeenCalledTimes(1);
 });
 
 it("inventories every nullable URL in the canonical extraction input profile", () => {

@@ -68,7 +68,7 @@ export type SavedResumeV2 = z.infer<typeof savedResumeV2Schema>;
 export function isResumeV2(r: SavedResume): r is SavedResumeV2 {
   return "formatVersion" in r && r.formatVersion === 2;
 }
-const backupV1Schema = z
+export const backupV1Schema = z
   .object({
     format: z.literal("dream-job"),
     version: z.literal(1),

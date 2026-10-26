@@ -17,7 +17,7 @@ import {
 import { analyzeJob } from "./job-analysis";
 import { tailor } from "./tailoring";
 import { ApiError } from "./errors";
-import { optionalUrlReviewWarnings } from "./extraction";
+import { optionalUrlReviewWarnings, extractionInstruction } from "./extraction";
 import {
   recordFailure,
   safeIssues,
@@ -258,16 +258,8 @@ export function createWorker(
           const extracted = await structured(
             env,
             extractionSchema,
-            "Extract only facts in the submitted text. Missing fields must remain blank. Do not verify the profile.",
+            extractionInstruction,
             input,
-            controller.signal,
-            fetcher,
-            context,
-          );
-          await audit(
-            env,
-            input,
-            extracted,
             controller.signal,
             fetcher,
             context,

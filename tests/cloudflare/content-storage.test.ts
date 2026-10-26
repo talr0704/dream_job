@@ -1,5 +1,6 @@
 import { it, expect } from "vitest";
 import { DreamJobDB, isResumeV2 } from "../../src/lib/storage";
+import { toJournal } from "../../src/lib/adapter";
 import { profile, resume } from "./fixtures";
 import { baseContent, contentDigest } from "../../shared/tailoring";
 const db = () => new DreamJobDB("content-" + crypto.randomUUID());
@@ -14,7 +15,11 @@ function legacy() {
     analysis: null,
     twoPages: false,
     createdAt: new Date().toISOString(),
-    manualProfile: null,
+    manualProfile: {
+      ...toJournal(profile),
+      summary: "Historical user-authored summary.",
+      headline: "Historical headline",
+    },
   };
 }
 async function current() {

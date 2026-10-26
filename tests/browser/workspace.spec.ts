@@ -307,7 +307,7 @@ test("invalid extraction responses preserve an already approved profile and its 
   ).toBeVisible();
   await expect(page.getByText("Alex Example", { exact: true })).toBeVisible();
 });
-test("rejected job factuality audit preserves job input and saved data without generating a resume", async ({
+test("optional analysis failure preserves data and does not block independent tailoring", async ({
   page,
 }) => {
   await mockAPI(page);
@@ -362,6 +362,16 @@ test("rejected job factuality audit preserves job input and saved data without g
   ).toBeEnabled();
   expect(await snapshot()).toEqual(before);
   expect(generated).toBe(0);
+  await page
+    .getByRole("button", { name: "✦ Generate resume", exact: true })
+    .click();
+  await expect(
+    page
+      .frameLocator('iframe[title="Resume preview"]')
+      .getByText("Alex Example", { exact: true }),
+  ).toBeVisible();
+  expect(generated).toBe(1);
+  expect(await snapshot()).toEqual(before);
 });
 test("one-call tailoring is independent, source-comparable and requires fresh resume review after edits", async ({
   page,
@@ -454,4 +464,47 @@ test("one-call tailoring is independent, source-comparable and requires fresh re
   );
   expect(after.resumes[0].formatVersion).toBe(2);
   expect(after.resumes[0].review.digest).toMatch(/^[a-f0-9]{64}$/);
+});
+
+test("historical manual resume snapshots reopen without conversion or loss", async ({
+  page,
+}) => {
+  await mockAPI(page);
+  await approve(page);
+  const historical = {
+    id: "97633515-4007-4022-9fca-ad250b973c5a",
+    title: "Historical manual",
+    folder: "",
+    profile,
+    resume,
+    jobDescription: "",
+    analysis: null,
+    twoPages: false,
+    createdAt: new Date().toISOString(),
+    manualProfile: {
+      ...toJournal(profile),
+      summary: "Historical manually edited summary.",
+      headline: "Historical custom headline",
+    },
+  };
+  await page.evaluate(async (record) => {
+    const { db } = await import("/src/lib/storage.ts");
+    await db.saveResume(record);
+  }, historical);
+  await page.reload();
+  await page.getByRole("button", { name: "My Resumes", exact: true }).click();
+  await page.getByRole("button", { name: "Open & edit", exact: true }).click();
+  const preview = page.frameLocator('iframe[title="Resume preview"]');
+  await expect(
+    preview.getByText("Historical manually edited summary.", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    preview.getByText("Historical custom headline", { exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(async (id) => {
+      const { db } = await import("/src/lib/storage.ts");
+      return db.resumes.get(id);
+    }, historical.id),
+  ).toEqual(historical);
 });

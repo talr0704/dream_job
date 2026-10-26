@@ -101,7 +101,26 @@ function normalizeLinkCandidates(value: unknown): unknown {
   );
 }
 export function parseExtractedProfile(value: unknown) {
-  const normalized = normalizeExtractedOptionalUrls(value);
+  let input = value;
+  if (
+    record(value) &&
+    record(value.profile) &&
+    ["id", "version", "verified", "updatedAt"].every(
+      (k) => !Object.hasOwn(value.profile as object, k),
+    )
+  ) {
+    input = {
+      ...value,
+      profile: {
+        ...value.profile,
+        id: crypto.randomUUID(),
+        version: 1,
+        verified: false,
+        updatedAt: new Date().toISOString(),
+      },
+    };
+  }
+  const normalized = normalizeExtractedOptionalUrls(input);
   let candidate = normalized;
   if (record(normalized) && record(normalized.profile)) {
     const profile = normalized.profile;
@@ -152,3 +171,5 @@ export function parseExtractedProfile(value: unknown) {
     warnings: [...warnings, ...checked.data.warnings].slice(0, 50),
   });
 }
+
+export const extractionInstruction = `Extract only facts from submitted professional text, in English. Do not infer qualifications. Leave missing non-URL strings empty, missing optional URLs null, and include required arrays. Missing/malformed/placeholder/unsupported personal LinkedIn/portfolio/GitHub and certification URLs must be null; links arrays can be empty and unusable link candidates can have null URLs. For every optional field, never infer, repair, or fabricate any URL. personal.linkedin must be null for absent or unsupported LinkedIn values; personal.portfolio, personal.github and certifications[].url must also be null when unusable. General profile links and project links are optional collections. Preserve valid project links with their exact supplied labels and URLs. Never infer or repair URLs; LinkedIn must be a supplied personal HTTPS LinkedIn profile URL. Preserve exact valid URLs and labels. Preserve all professional facts even if an optional link is unusable. Do not put professional achievements only in link labels. Preserve existing record/fact IDs on updates; assign unique stable IDs to new records. Provenance uses document source and short exact quotes when available. Warn about missing/ambiguous facts. Never mark facts verified. Omit application-owned root profile id, version, updatedAt and verified fields; the application assigns them before review.`;

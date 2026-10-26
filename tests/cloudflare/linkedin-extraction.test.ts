@@ -158,10 +158,7 @@ it("uses the shared nullable field contract and an explicit null/no-fabrication 
   expect(r.status).toBe(200);
   const req = JSON.parse(fetcher.mock.calls[0][1].body);
   expect(req.messages[0].content).toContain("personal.linkedin must be null");
-  const audit = JSON.parse(
-    JSON.parse(fetcher.mock.calls[1][1].body).messages[1].content,
-  );
-  expect(audit.output.profile.personal.linkedin).toBeNull();
+  expect(fetcher).toHaveBeenCalledTimes(1);
 });
 it("returns an unapproved review draft with a safe warning and never changes the saved master", async () => {
   const db = new DreamJobDB("linkedin-" + crypto.randomUUID());

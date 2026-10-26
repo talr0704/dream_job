@@ -121,12 +121,12 @@ export class DreamJobClient {
   }
   generateResume(input: ApiInput<"generate-resume">) {
     return this.call("generate-resume", input).then((v) =>
-      tailoredResumeSchema.parse(v),
+      this.checked(tailoredResumeSchema, v),
     );
   }
   refineResume(input: ApiInput<"refine-resume">) {
     return this.call("refine-resume", input).then((v) =>
-      tailoredResumeSchema.parse(v),
+      this.checked(tailoredResumeSchema, v),
     );
   }
   tailorResume(
@@ -136,7 +136,7 @@ export class DreamJobClient {
     >,
   ) {
     return this.call("generate-resume", { ...input, formatVersion: 2 }).then(
-      (v) => tailoringResponseSchema.parse(v),
+      (v) => this.checked(tailoringResponseSchema, v),
     );
   }
   refineContent(
@@ -146,8 +146,25 @@ export class DreamJobClient {
     >,
   ) {
     return this.call("refine-resume", { ...input, formatVersion: 2 }).then(
-      (v) => tailoringResponseSchema.parse(v),
+      (v) => this.checked(tailoringResponseSchema, v),
     );
+  }
+  private checked<T>(
+    schema: {
+      safeParse: (
+        v: unknown,
+      ) => { success: true; data: T } | { success: false };
+    },
+    value: unknown,
+  ): T {
+    const parsed = schema.safeParse(value);
+    if (!parsed.success)
+      throw new ClientError(
+        "INVALID_RESPONSE",
+        "The response did not match the requested resume format. No changes were saved.",
+        502,
+      );
+    return parsed.data;
   }
   signInUrl() {
     return `${this.baseUrl}/api/analyze-job`;

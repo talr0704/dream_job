@@ -314,10 +314,7 @@ it("returns project-index warnings for every affected project within limits and 
     expect(first.messages[0].content).toContain(
       "Preserve valid project links with their exact supplied labels and URLs",
     );
-    const audit = JSON.parse(
-      JSON.parse(fetcher.mock.calls[1][1].body).messages[1].content,
-    );
-    expect(audit.output.profile.projects).toEqual(result.profile.projects);
+    expect(fetcher).toHaveBeenCalledTimes(1);
     expect(await db.professionalProfiles.toArray()).toEqual(before);
     expect(await db.profileVersions.count()).toBe(1);
     expect(log).not.toHaveBeenCalled();
@@ -325,7 +322,7 @@ it("returns project-index warnings for every affected project within limits and 
     await db.delete();
   }
 });
-it("still rejects unsupported project facts in the independent factuality audit", async () => {
+it("keeps all extracted project facts unapproved pending user review", async () => {
   const fetcher = vi
     .fn()
     .mockResolvedValueOnce(mockAI(draft([link(1, "N/A")])))
@@ -344,8 +341,9 @@ it("still rejects unsupported project facts in the independent factuality audit"
     }),
     env,
   );
-  expect(response.status).toBe(422);
-  expect(((await response.json()) as any).error.code).toBe("UNSUPPORTED_CLAIM");
+  expect(response.status).toBe(200);
+  expect(((await response.json()) as any).profile.verified).toBe(false);
+  expect(fetcher).toHaveBeenCalledTimes(1);
   expect(JSON.stringify(log.mock.calls)).not.toContain(
     "Private synthetic project",
   );
