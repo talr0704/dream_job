@@ -1,5 +1,7 @@
 # Analysis source reference contract
 
+PR #14 investigation. The subsequent [assessment architecture](analysis-assessment-architecture.md) introduces a shared status rubric, complete independent status reviews and one narrowly constrained, disclosed revision followed by a fresh audit. Its reference/membership checks retain this contract.
+
 ## Exact evidence and diagnostic ambiguity
 
 Worker version `d90c15e8-e71a-4925-90e9-11cc9c22ff90`, request `4bf2c46c-eea3-4a72-929e-6ff214f5bb3a`, returned HTTP 422 / `UNSUPPORTED_CLAIM`, factuality source `application`, rule `invalid_source_reference`, path `requirements.4.sourceFactIds`.

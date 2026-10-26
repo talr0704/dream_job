@@ -365,3 +365,64 @@ test("rejected job factuality audit preserves job input and saved data without g
   expect(await snapshot()).toEqual(before);
   expect(generated).toBe(0);
 });
+test("audited assessment revisions are visible and saved without changing the approved profile", async ({
+  page,
+}) => {
+  await mockAPI(page);
+  await approve(page);
+  const before = await page.evaluate(async () => {
+    const { db } = await import("/src/lib/storage.ts");
+    return {
+      profiles: await db.professionalProfiles.toArray(),
+      versions: await db.profileVersions.toArray(),
+    };
+  });
+  const notice =
+    "Evidence review revised 1 requirement assessment: 1 met to partial. Review their evidence before using this analysis.";
+  const revised = {
+    ...analysis,
+    score: 50,
+    requirements: analysis.requirements.map((r) => ({
+      ...r,
+      status: "partial",
+      evidence: "TypeScript is evidenced; Python is not evidenced.",
+    })),
+    experienceAlignment: analysis.experienceAlignment + "\n" + notice,
+  };
+  await page.route("**/api/analyze-job", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(revised),
+    }),
+  );
+  await page.getByRole("button", { name: "Job Match", exact: true }).click();
+  await page
+    .getByRole("textbox", { name: "Job description", exact: true })
+    .fill(
+      "Required: TypeScript and Python application development experience.",
+    );
+  await page
+    .getByRole("button", { name: "✦ Analyze & Generate", exact: true })
+    .click();
+  await expect(page.getByRole("progressbar")).toHaveAttribute(
+    "aria-valuenow",
+    "50",
+  );
+  await expect(
+    page.getByText(revised.experienceAlignment, { exact: true }),
+  ).toBeVisible();
+  const after = await page.evaluate(async () => {
+    const { db } = await import("/src/lib/storage.ts");
+    return {
+      profiles: await db.professionalProfiles.toArray(),
+      versions: await db.profileVersions.toArray(),
+      analyses: await db.jobAnalyses.toArray(),
+    };
+  });
+  expect({ profiles: after.profiles, versions: after.versions }).toEqual(
+    before,
+  );
+  expect(after.analyses).toHaveLength(1);
+  expect(after.analyses[0].analysis.score).toBe(50);
+  expect(after.analyses[0].analysis.experienceAlignment).toContain(notice);
+});

@@ -1,6 +1,14 @@
 import { it, expect, vi } from "vitest";
 import { createWorker } from "../../worker/index";
-import { profile, resume, analysis, env, identity, mockAI } from "./fixtures";
+import {
+  profile,
+  resume,
+  analysis,
+  env,
+  identity,
+  mockAI,
+  auditWithStatuses,
+} from "./fixtures";
 import { toJournal } from "../../src/lib/adapter";
 const request = (
   endpoint: string,
@@ -111,7 +119,7 @@ it("computes the score and returns grounded analysis after an independent audit"
         })),
       }),
     )
-    .mockResolvedValueOnce(mockAI({ supported: true, violations: [] }));
+    .mockResolvedValueOnce(mockAI(auditWithStatuses(analysisDraft)));
   const r = await createWorker({ authenticate: identity, fetcher }).fetch(
     request("analyze-job", {
       profile,
