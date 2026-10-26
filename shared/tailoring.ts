@@ -133,7 +133,16 @@ export function guardContent(raw: unknown, p: ProfessionalProfile) {
       `Project ${i + 1}`,
     );
   });
-  return { content: c, warnings };
+  return {
+    content: c,
+    warnings:
+      warnings.length > 50
+        ? [
+            `Focused factuality checks retained original approved wording in ${warnings.length} sections. Review all source comparisons.`,
+            ...warnings.slice(0, 49),
+          ]
+        : warnings,
+  };
 }
 export async function contentDigest(p: ProfessionalProfile, c: ResumeContent) {
   const data = new TextEncoder().encode(

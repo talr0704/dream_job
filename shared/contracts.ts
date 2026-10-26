@@ -322,7 +322,7 @@ export type TailoredResume = z.infer<typeof tailoredResumeSchema>;
 export const resumeContentSchema = z
   .object({
     summary: nonempty,
-    skillIds: z.array(id).max(100),
+    skillIds: z.array(id).min(1).max(100),
     experience: z
       .array(
         z

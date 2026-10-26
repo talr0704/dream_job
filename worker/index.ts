@@ -15,6 +15,7 @@ import {
   type AIEnv,
 } from "./ai";
 import { analyzeJob } from "./job-analysis";
+import { tailor } from "./tailoring";
 import { ApiError } from "./errors";
 import { optionalUrlReviewWarnings } from "./extraction";
 import {
@@ -294,6 +295,19 @@ export function createWorker(
           output = await analyzeJob(
             env,
             input,
+            controller.signal,
+            fetcher,
+            context,
+          );
+        } else if (input.formatVersion === 2) {
+          context.operation =
+            endpoint === "generate-resume" ? "generate" : "refine";
+          output = await tailor(
+            env,
+            input.profile,
+            input.jobDescription,
+            input.content,
+            input.instructions,
             controller.signal,
             fetcher,
             context,
