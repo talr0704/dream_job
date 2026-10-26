@@ -11,6 +11,7 @@ import {
   professionalProfileSchema,
   type ProfessionalProfile,
   type TailoredResume,
+  type ResumeContent,
   type JobAnalysis,
 } from "../shared/contracts";
 import {
@@ -18,6 +19,8 @@ import {
   backupSchema,
   savedResumeSchema,
   type SavedResume,
+  type SavedResumeV2,
+  isResumeV2,
 } from "./lib/storage";
 import { DreamJobClient } from "./lib/api";
 import {
@@ -28,6 +31,12 @@ import {
   displayAnalysis,
   applyManualText,
 } from "./lib/adapter";
+import { contentToJournal } from "./lib/content-adapter";
+import {
+  contentDigest,
+  baseContent,
+  validateContent,
+} from "../shared/tailoring";
 import { extractDocumentText } from "./lib/documents";
 import { printResume } from "./lib/print";
 import {
@@ -78,7 +87,11 @@ function App() {
     [twoPages, setTwoPages] = useState(false),
     [loaded, setLoaded] = useState(false),
     [legacy, setLegacy] = useState<any>(legacyBrowserProfile),
-    [history, setHistory] = useState<any[]>([]);
+    [history, setHistory] = useState<any[]>([]),
+    [content, setContentState] = useState<ResumeContent | null>(null),
+    [contentWarnings, setContentWarnings] = useState<string[]>([]),
+    [review, setReview] = useState<SavedResumeV2["review"]>(null);
+  const contentRef = useRef<ResumeContent | null>(null);
   const master = useRef<ProfessionalProfile | null>(null),
     sourceProfile = useRef<ProfessionalProfile | null>(null),
     tailored = useRef<TailoredResume | null>(null),
@@ -117,8 +130,13 @@ function App() {
     return (await db.resumes.orderBy("createdAt").reverse().toArray()).map(
       (r) => ({
         ...r,
-        profile: r.manualProfile || resumeToJournal(r.profile, r.resume),
-        analysis: r.analysis ? displayAnalysis(r.analysis, r.profile) : null,
+        profile: isResumeV2(r)
+          ? contentToJournal(r.profile, r.content)
+          : r.manualProfile || resumeToJournal(r.profile, r.resume),
+        analysis:
+          !isResumeV2(r) && r.analysis
+            ? displayAnalysis(r.analysis, r.profile)
+            : null,
         _stored: r,
       }),
     );
@@ -315,8 +333,12 @@ function App() {
   function openVersion(item: any) {
     const r: SavedResume = item._stored;
     sourceProfile.current = r.profile;
-    resumeAnalysis.current = r.analysis;
-    tailored.current = r.resume;
+    resumeAnalysis.current = isResumeV2(r) ? null : r.analysis;
+    tailored.current = isResumeV2(r) ? null : r.resume;
+    contentRef.current = isResumeV2(r) ? r.content : null;
+    setContentState(contentRef.current);
+    setContentWarnings(isResumeV2(r) ? r.warnings : []);
+    setReview(isResumeV2(r) ? r.review : null);
     setResume(structuredClone(item.profile));
     setSourceJob(r.jobDescription);
     setJob(r.jobDescription);

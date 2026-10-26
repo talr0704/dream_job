@@ -1,5 +1,7 @@
 import {
   endpoints,
+  tailoredResumeSchema,
+  tailoringResponseSchema,
   type Endpoint,
   type ApiInput,
   type ApiOutput,
@@ -118,10 +120,34 @@ export class DreamJobClient {
     return this.call("analyze-job", input);
   }
   generateResume(input: ApiInput<"generate-resume">) {
-    return this.call("generate-resume", input);
+    return this.call("generate-resume", input).then((v) =>
+      tailoredResumeSchema.parse(v),
+    );
   }
   refineResume(input: ApiInput<"refine-resume">) {
-    return this.call("refine-resume", input);
+    return this.call("refine-resume", input).then((v) =>
+      tailoredResumeSchema.parse(v),
+    );
+  }
+  tailorResume(
+    input: Omit<
+      Extract<ApiInput<"generate-resume">, { formatVersion: 2 }>,
+      "formatVersion"
+    >,
+  ) {
+    return this.call("generate-resume", { ...input, formatVersion: 2 }).then(
+      (v) => tailoringResponseSchema.parse(v),
+    );
+  }
+  refineContent(
+    input: Omit<
+      Extract<ApiInput<"refine-resume">, { formatVersion: 2 }>,
+      "formatVersion"
+    >,
+  ) {
+    return this.call("refine-resume", { ...input, formatVersion: 2 }).then(
+      (v) => tailoringResponseSchema.parse(v),
+    );
   }
   signInUrl() {
     return `${this.baseUrl}/api/analyze-job`;

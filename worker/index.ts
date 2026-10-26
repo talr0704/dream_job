@@ -4,6 +4,7 @@ import {
   type Endpoint,
   validateAnalysis,
   validateResume,
+  tailoredResumeSchema,
 } from "../shared/contracts";
 import { verifyAccess, accessIssuer, type AccessConfig } from "./auth";
 import {
@@ -313,7 +314,7 @@ export function createWorker(
             validateResume(input.resume, input.profile);
           const draft = await structured(
             env,
-            endpoints["generate-resume"].response,
+            tailoredResumeSchema,
             endpoint === "generate-resume"
               ? "Tailor a resume. Metadata is selected by IDs, never rewritten. Each achievement must cite only the achievements of its own record."
               : "Refine the current resume according to requested edits, within the master profile facts. Never modify the profile.",

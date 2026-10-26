@@ -317,6 +317,44 @@ export const tailoredResumeSchema = z
   })
   .strict();
 export type TailoredResume = z.infer<typeof tailoredResumeSchema>;
+// Small content-only DTO. The array shape permits future same-experience merges;
+// version 2 deliberately allows exactly one approved achievement per bullet.
+export const resumeContentSchema = z
+  .object({
+    summary: nonempty,
+    skillIds: z.array(id).max(100),
+    experience: z
+      .array(
+        z
+          .object({
+            experienceId: id,
+            bullets: z
+              .array(
+                z
+                  .object({
+                    sourceAchievementIds: z.array(id).length(1),
+                    text: nonempty,
+                  })
+                  .strict(),
+              )
+              .max(20),
+          })
+          .strict(),
+      )
+      .max(10),
+    projects: z
+      .array(z.object({ projectId: id, description: nonempty }).strict())
+      .max(10),
+  })
+  .strict();
+export type ResumeContent = z.infer<typeof resumeContentSchema>;
+export const tailoringResponseSchema = z
+  .object({
+    formatVersion: z.literal(2),
+    content: resumeContentSchema,
+    warnings: z.array(nonempty).max(50),
+  })
+  .strict();
 const jobDescription = z.string().trim().min(40).max(18000);
 export const extractRequestSchema = z
   .object({ text: z.string().trim().min(20).max(60000) })
@@ -395,20 +433,43 @@ export const analyzeRequestSchema = z
     jobUrl: urlSchema.optional(),
   })
   .strict();
-export const generateRequestSchema = z
+export const legacyGenerateRequestSchema = z
   .object({
     profile: verifiedProfileSchema,
     jobDescription,
     analysis: analysisSchema.optional(),
   })
   .strict();
-export const refineRequestSchema = z
+export const legacyRefineRequestSchema = z
   .object({
     profile: verifiedProfileSchema,
     resume: tailoredResumeSchema,
     instructions: z.string().trim().min(3).max(6000),
   })
   .strict();
+export const contentGenerateRequestSchema = z
+  .object({
+    formatVersion: z.literal(2),
+    profile: verifiedProfileSchema,
+    jobDescription,
+  })
+  .strict();
+export const contentRefineRequestSchema = z
+  .object({
+    formatVersion: z.literal(2),
+    profile: verifiedProfileSchema,
+    content: resumeContentSchema,
+    instructions: z.string().trim().min(3).max(6000),
+  })
+  .strict();
+export const generateRequestSchema = z.union([
+  contentGenerateRequestSchema,
+  legacyGenerateRequestSchema,
+]);
+export const refineRequestSchema = z.union([
+  contentRefineRequestSchema,
+  legacyRefineRequestSchema,
+]);
 export const endpoints = {
   "extract-profile": {
     request: extractRequestSchema,
@@ -417,11 +478,11 @@ export const endpoints = {
   "analyze-job": { request: analyzeRequestSchema, response: analysisSchema },
   "generate-resume": {
     request: generateRequestSchema,
-    response: tailoredResumeSchema,
+    response: z.union([tailoringResponseSchema, tailoredResumeSchema]),
   },
   "refine-resume": {
     request: refineRequestSchema,
-    response: tailoredResumeSchema,
+    response: z.union([tailoringResponseSchema, tailoredResumeSchema]),
   },
 } as const;
 export type Endpoint = keyof typeof endpoints;
