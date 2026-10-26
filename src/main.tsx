@@ -11,6 +11,7 @@ import {
   professionalProfileSchema,
   type ProfessionalProfile,
   type TailoredResume,
+  type ResumeContent,
   type JobAnalysis,
 } from "../shared/contracts";
 import {
@@ -18,6 +19,8 @@ import {
   backupSchema,
   savedResumeSchema,
   type SavedResume,
+  type SavedResumeV2,
+  isResumeV2,
 } from "./lib/storage";
 import { DreamJobClient } from "./lib/api";
 import {
@@ -28,6 +31,13 @@ import {
   displayAnalysis,
   applyManualText,
 } from "./lib/adapter";
+import { contentToJournal } from "./lib/content-adapter";
+import {
+  contentDigest,
+  baseContent,
+  validateContent,
+  guardContent,
+} from "../shared/tailoring";
 import { extractDocumentText } from "./lib/documents";
 import { printResume } from "./lib/print";
 import {
@@ -38,6 +48,7 @@ import {
 } from "./components/World.jsx";
 import { Journal } from "./components/Journal.jsx";
 import { Match } from "./components/Match.jsx";
+import { TailoringReview } from "./components/TailoringReview";
 import { Builder } from "./components/Builder.jsx";
 import { Library } from "./components/Library.jsx";
 import "./style.css";
@@ -78,7 +89,11 @@ function App() {
     [twoPages, setTwoPages] = useState(false),
     [loaded, setLoaded] = useState(false),
     [legacy, setLegacy] = useState<any>(legacyBrowserProfile),
-    [history, setHistory] = useState<any[]>([]);
+    [history, setHistory] = useState<any[]>([]),
+    [content, setContentState] = useState<ResumeContent | null>(null),
+    [contentWarnings, setContentWarnings] = useState<string[]>([]),
+    [review, setReview] = useState<SavedResumeV2["review"]>(null);
+  const contentRef = useRef<ResumeContent | null>(null);
   const master = useRef<ProfessionalProfile | null>(null),
     sourceProfile = useRef<ProfessionalProfile | null>(null),
     tailored = useRef<TailoredResume | null>(null),
@@ -107,6 +122,9 @@ function App() {
       setProfile(toJournal(p));
       setResume(toJournal(p));
       tailored.current = baseResume(p);
+      contentRef.current = baseContent(p);
+      setContentState(contentRef.current);
+      setReview(null);
     }
     setItems(await listItems());
     setHistory(await db.profileVersions.orderBy("version").reverse().toArray());
@@ -117,8 +135,13 @@ function App() {
     return (await db.resumes.orderBy("createdAt").reverse().toArray()).map(
       (r) => ({
         ...r,
-        profile: r.manualProfile || resumeToJournal(r.profile, r.resume),
-        analysis: r.analysis ? displayAnalysis(r.analysis, r.profile) : null,
+        profile: isResumeV2(r)
+          ? contentToJournal(r.profile, r.content)
+          : r.manualProfile || resumeToJournal(r.profile, r.resume),
+        analysis:
+          !isResumeV2(r) && r.analysis
+            ? displayAnalysis(r.analysis, r.profile)
+            : null,
         _stored: r,
       }),
     );
@@ -194,6 +217,9 @@ function App() {
         sourceProfile.current = saved;
         tailored.current = baseResume(saved);
         setResume(toJournal(saved));
+        contentRef.current = baseContent(saved);
+        setContentState(contentRef.current);
+        setReview(null);
       }
       setMessage(
         "Approved profile saved in this browser. Historical resumes are unchanged.",
@@ -205,6 +231,28 @@ function App() {
       return refine(
         "Make this resume more concise without losing factual meaning.",
       );
+    return task("Tailoring your resume…", async () => {
+      if (!master.current)
+        throw Error("Approve your professional profile first.");
+      const p = structuredClone(master.current);
+      const r = await client.tailorResume({ profile: p, jobDescription: job });
+      sourceProfile.current = p;
+      resumeAnalysis.current = null;
+      tailored.current = null;
+      contentRef.current = r.content;
+      setContentState(r.content);
+      setContentWarnings(r.warnings);
+      setReview(null);
+      setResume(contentToJournal(p, r.content));
+      setSourceJob(job);
+      setTwoPages(false);
+      go("builder");
+      setMessage(
+        "Tailored draft generated. Review every claim before exporting.",
+      );
+    });
+  }
+  async function analyze() {
     return task("Analyzing your fit…", async () => {
       if (!master.current)
         throw Error("Approve your professional profile first.");
@@ -221,24 +269,26 @@ function App() {
         createdAt: new Date().toISOString(),
       });
       setResult(displayAnalysis(analysis, p));
-      const r = await client.generateResume({
-        profile: p,
-        jobDescription: job,
-        analysis,
-      });
-      sourceProfile.current = p;
-      resumeAnalysis.current = analysis;
-      tailored.current = r;
-      setResume(resumeToJournal(p, r));
-      setSourceJob(job);
-      setTwoPages(false);
-      setMessage(
-        "Tailored draft generated. Review every claim before exporting.",
-      );
     });
   }
   async function refine(instructions: string) {
     return task("Refining resume…", async () => {
+      if (sourceProfile.current && contentRef.current) {
+        const r = await client.refineContent({
+          profile: sourceProfile.current,
+          content: contentRef.current,
+          instructions,
+        });
+        contentRef.current = r.content;
+        setContentState(r.content);
+        setContentWarnings(r.warnings);
+        setReview(null);
+        setResume(contentToJournal(sourceProfile.current, r.content));
+        setMessage(
+          "Refined draft ready. Review it again before exporting. Master profile is unchanged.",
+        );
+        return;
+      }
       if (!sourceProfile.current || !tailored.current)
         throw Error("Generate or open a resume first.");
       const r = await client.refineResume({
@@ -257,6 +307,15 @@ function App() {
   }
   async function download(p: any, pages = false) {
     return task("Rendering PDF…", async () => {
+      if (contentRef.current && sourceProfile.current) {
+        if (
+          !review ||
+          review.digest !==
+            (await contentDigest(sourceProfile.current, contentRef.current))
+        )
+          throw Error("Review this tailored resume before exporting.");
+        p = contentToJournal(sourceProfile.current, contentRef.current);
+      }
       profileSchema.parse(p);
       await printResume(p, pages);
       setMessage(
@@ -266,6 +325,26 @@ function App() {
   }
   async function saveVersion(title: string, folder: string) {
     return task("Saving version…", async () => {
+      if (sourceProfile.current && contentRef.current) {
+        await db.saveResume({
+          formatVersion: 2,
+          id: crypto.randomUUID(),
+          title: title.trim(),
+          folder: folder.trim(),
+          profile: sourceProfile.current,
+          content: contentRef.current,
+          jobDescription: sourceJob,
+          twoPages,
+          createdAt: new Date().toISOString(),
+          review,
+          warnings: contentWarnings,
+        });
+        setItems(await listItems());
+        setMessage(
+          "Independent resume draft saved locally. Review remains separate from profile approval.",
+        );
+        return;
+      }
       if (!sourceProfile.current || !tailored.current)
         throw Error("Approve a profile or generate a resume first.");
       profileSchema.parse(resume);
@@ -306,20 +385,68 @@ function App() {
       setItems(await listItems());
     });
   }
+  function updateContent(next: ResumeContent) {
+    if (!sourceProfile.current) return;
+    // Empty text is allowed while typing, but approval/save/export enforce schema.
+    contentRef.current = next;
+    setContentState(next);
+    setReview(null);
+    try {
+      setResume(contentToJournal(sourceProfile.current, next));
+    } catch {
+      /* Preserve incomplete editor input until corrected. */
+    }
+  }
+  function approveContent(checked: boolean) {
+    if (!checked) {
+      setReview(null);
+      return;
+    }
+    return task("Recording resume review…", async () => {
+      if (!sourceProfile.current || !contentRef.current)
+        throw Error("Open a resume first.");
+      const p = sourceProfile.current,
+        c = validateContent(contentRef.current, p),
+        key = JSON.stringify(contentRef.current);
+      const guarded = guardContent(c, p);
+      if (JSON.stringify(guarded.content) !== JSON.stringify(c))
+        throw Error(
+          "A draft edit failed focused factuality checks. Compare with the approved source or update My Profile before approval.",
+        );
+      const digest = await contentDigest(p, c);
+      if (
+        key === JSON.stringify(contentRef.current) &&
+        p === sourceProfile.current
+      )
+        setReview({ reviewedAt: new Date().toISOString(), digest });
+    });
+  }
   function openVersion(item: any) {
-    const r: SavedResume = item._stored;
-    sourceProfile.current = r.profile;
-    resumeAnalysis.current = r.analysis;
-    tailored.current = r.resume;
-    setResume(structuredClone(item.profile));
-    setSourceJob(r.jobDescription);
-    setJob(r.jobDescription);
-    setResult(item.analysis);
-    setTwoPages(r.twoPages);
-    go("builder");
-    setMessage(
-      "Historical snapshot opened. Save as a new version to keep edits.",
-    );
+    return task("Opening resume…", async () => {
+      const r = savedResumeSchema.parse(item._stored);
+      sourceProfile.current = r.profile;
+      resumeAnalysis.current = isResumeV2(r) ? null : r.analysis;
+      tailored.current = isResumeV2(r) ? null : r.resume;
+      contentRef.current = isResumeV2(r) ? r.content : null;
+      setContentState(contentRef.current);
+      setContentWarnings(isResumeV2(r) ? r.warnings : []);
+      setReview(
+        isResumeV2(r) &&
+          r.review &&
+          r.review.digest === (await contentDigest(r.profile, r.content))
+          ? r.review
+          : null,
+      );
+      setResume(structuredClone(item.profile));
+      setSourceJob(r.jobDescription);
+      setJob(r.jobDescription);
+      setResult(item.analysis);
+      setTwoPages(r.twoPages);
+      go("builder");
+      setMessage(
+        "Historical snapshot opened. Save as a new version to keep edits.",
+      );
+    });
   }
   function account() {
     window.open(client.signInUrl(), "_blank", "noopener,noreferrer");
@@ -332,7 +459,7 @@ function App() {
       );
       const a = document.createElement("a");
       a.href = url;
-      a.download = "dream-job-backup-v1.json";
+      a.download = "dream-job-backup-v2.json";
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
@@ -514,6 +641,7 @@ function App() {
                     setJob={setJob}
                     result={result}
                     generate={generate}
+                    analyze={analyze}
                     busy={busy}
                     canUse={canUse}
                     go={go}
@@ -524,6 +652,21 @@ function App() {
                     onRefine={refine}
                     resume={resume}
                     setResume={setResume}
+                    requiresReview={!!content}
+                    reviewed={!!review}
+                    reviewPanel={
+                      content && sourceProfile.current ? (
+                        <TailoringReview
+                          profile={sourceProfile.current}
+                          content={content}
+                          update={updateContent}
+                          reviewed={!!review}
+                          approve={approveContent}
+                          busy={!!busy}
+                          warnings={contentWarnings}
+                        />
+                      ) : null
+                    }
                     twoPages={twoPages}
                     setTwoPages={setTwoPages}
                     busy={busy}

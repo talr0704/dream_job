@@ -4,6 +4,7 @@ import {
   type Endpoint,
   validateAnalysis,
   validateResume,
+  tailoredResumeSchema,
 } from "../shared/contracts";
 import { verifyAccess, accessIssuer, type AccessConfig } from "./auth";
 import {
@@ -14,8 +15,9 @@ import {
   type AIEnv,
 } from "./ai";
 import { analyzeJob } from "./job-analysis";
+import { tailor } from "./tailoring";
 import { ApiError } from "./errors";
-import { optionalUrlReviewWarnings } from "./extraction";
+import { optionalUrlReviewWarnings, extractionInstruction } from "./extraction";
 import {
   recordFailure,
   safeIssues,
@@ -256,16 +258,8 @@ export function createWorker(
           const extracted = await structured(
             env,
             extractionSchema,
-            "Extract only facts in the submitted text. Missing fields must remain blank. Do not verify the profile.",
+            extractionInstruction,
             input,
-            controller.signal,
-            fetcher,
-            context,
-          );
-          await audit(
-            env,
-            input,
-            extracted,
             controller.signal,
             fetcher,
             context,
@@ -297,10 +291,23 @@ export function createWorker(
             fetcher,
             context,
           );
+        } else if (input.formatVersion === 2) {
+          context.operation =
+            endpoint === "generate-resume" ? "generate" : "refine";
+          output = await tailor(
+            env,
+            input.profile,
+            input.jobDescription,
+            input.content,
+            input.instructions,
+            controller.signal,
+            fetcher,
+            context,
+          );
         } else {
           context.operation =
             endpoint === "generate-resume" ? "generate" : "refine";
-          if (endpoint === "generate-resume") {
+          if (endpoint === "generate-resume" && input.analysis) {
             const { score, ...draft } = input.analysis;
             const checked = validateAnalysis(draft, input.profile);
             if (score !== checked.score)
@@ -309,10 +316,11 @@ export function createWorker(
                 "Job analysis score is inconsistent.",
                 400,
               );
-          } else validateResume(input.resume, input.profile);
+          } else if (endpoint === "refine-resume")
+            validateResume(input.resume, input.profile);
           const draft = await structured(
             env,
-            endpoints["generate-resume"].response,
+            tailoredResumeSchema,
             endpoint === "generate-resume"
               ? "Tailor a resume. Metadata is selected by IDs, never rewritten. Each achievement must cite only the achievements of its own record."
               : "Refine the current resume according to requested edits, within the master profile facts. Never modify the profile.",

@@ -162,11 +162,7 @@ it("the complete historical failure fixture passes the full mocked pipeline and 
     expect(result.profile.verified).toBe(false);
     for (const category of warningCategories)
       expect(result.warnings.some((w) => w.includes(category))).toBe(true);
-    const audit = JSON.parse(
-      JSON.parse(fetcher.mock.calls[1][1].body).messages[1].content,
-    );
-    expect(audit.output.profile).toEqual(fixture.expectedProfile);
-    expect(audit.output.warnings.join(" ")).toContain("General profile links:");
+    expect(fetcher).toHaveBeenCalledTimes(1);
     const provider = JSON.parse(fetcher.mock.calls[0][1].body);
     expect(provider.messages[0].content).toContain(
       "General profile links and project links are optional collections",
@@ -244,7 +240,7 @@ it("uses one supported nullable candidate URL schema for both collections and st
     }).success,
   ).toBe(true);
 });
-it("still rejects unsupported professional facts after every URL recovery", async () => {
+it("requires user review of the complete extracted draft after URL recovery", async () => {
   const log = vi.fn();
   const fetcher = vi
     .fn()
@@ -260,8 +256,9 @@ it("still rejects unsupported professional facts after every URL recovery", asyn
     }),
     env,
   );
-  expect(r.status).toBe(422);
-  expect(((await r.json()) as any).error.code).toBe("UNSUPPORTED_CLAIM");
+  expect(r.status).toBe(200);
+  expect(((await r.json()) as any).profile.verified).toBe(false);
+  expect(fetcher).toHaveBeenCalledTimes(1);
   expect(JSON.stringify(log.mock.calls)).not.toContain("Alex Synthetic");
   expect(JSON.stringify(log.mock.calls)).not.toContain(
     "Built 3 accessible applications",

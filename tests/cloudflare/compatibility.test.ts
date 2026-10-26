@@ -5,7 +5,10 @@ import {
   profileDraftSchema,
   resumeSnapshotSchema,
 } from "../../shared/workspace.js";
-import { savedResumeSchema, backupSchema } from "../../src/lib/storage";
+import {
+  legacySavedResumeSchema as savedResumeSchema,
+  backupV1Schema as backupSchema,
+} from "../../src/lib/storage";
 import fixtures from "./contract-compatibility.json";
 const schemas: any = {
   professionalProfile: c.professionalProfileSchema,

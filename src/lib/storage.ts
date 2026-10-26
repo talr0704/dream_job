@@ -1,3 +1,4 @@
+import { validateContent, contentDigest } from "../../shared/tailoring";
 import { profileSchema } from "../../shared/model.js";
 import Dexie, { type Table } from "dexie";
 import { z } from "zod";
@@ -7,6 +8,7 @@ import {
   verifiedProfileSchema,
   analysisSchema,
   tailoredResumeSchema,
+  resumeContentSchema,
   validateResume,
   validateAnalysis,
   type ProfessionalProfile,
@@ -20,7 +22,7 @@ export const savedAnalysisSchema = z
     createdAt: timestampSchema,
   })
   .strict();
-export const savedResumeSchema = z
+export const legacySavedResumeSchema = z
   .object({
     id: z.string().uuid(),
     title: z.string().trim().min(1).max(120),
@@ -36,8 +38,37 @@ export const savedResumeSchema = z
       .nullable(),
   })
   .strict();
+export const savedResumeV2Schema = z
+  .object({
+    formatVersion: z.literal(2),
+    id: z.string().uuid(),
+    title: z.string().trim().min(1).max(120),
+    folder: z.string().max(80),
+    profile: verifiedProfileSchema,
+    content: resumeContentSchema,
+    jobDescription: z.string().max(18000),
+    twoPages: z.boolean(),
+    createdAt: timestampSchema,
+    review: z
+      .object({
+        reviewedAt: timestampSchema,
+        digest: z.string().regex(/^[a-f0-9]{64}$/),
+      })
+      .strict()
+      .nullable(),
+    warnings: z.array(z.string().min(1).max(3000)).max(50),
+  })
+  .strict();
+export const savedResumeSchema = z.union([
+  savedResumeV2Schema,
+  legacySavedResumeSchema,
+]);
 export type SavedResume = z.infer<typeof savedResumeSchema>;
-export const backupSchema = z
+export type SavedResumeV2 = z.infer<typeof savedResumeV2Schema>;
+export function isResumeV2(r: SavedResume): r is SavedResumeV2 {
+  return "formatVersion" in r && r.formatVersion === 2;
+}
+export const backupV1Schema = z
   .object({
     format: z.literal("dream-job"),
     version: z.literal(1),
@@ -45,7 +76,7 @@ export const backupSchema = z
     professionalProfiles: z.array(verifiedProfileSchema).max(100),
     profileVersions: z.array(verifiedProfileSchema).max(10000),
     jobAnalyses: z.array(savedAnalysisSchema).max(10000),
-    resumes: z.array(savedResumeSchema).max(10000),
+    resumes: z.array(legacySavedResumeSchema).max(10000),
     settings: z
       .array(
         z
@@ -55,6 +86,31 @@ export const backupSchema = z
       .max(100),
   })
   .strict();
+const backupV2Schema = backupV1Schema.extend({
+  version: z.literal(2),
+  resumes: z.array(savedResumeSchema).max(10000),
+});
+export const backupSchema = z.discriminatedUnion("version", [
+  backupV1Schema,
+  backupV2Schema,
+]);
+async function validateSavedResume(r: SavedResume) {
+  if (isResumeV2(r)) {
+    validateContent(r.content, r.profile);
+    if (
+      r.review &&
+      r.review.digest !== (await contentDigest(r.profile, r.content))
+    )
+      throw Error("Resume review does not match current content");
+  } else {
+    validateResume(r.resume, r.profile);
+    if (r.analysis) {
+      const { score, ...draft } = r.analysis;
+      if (validateAnalysis(draft, r.profile).score !== score)
+        throw Error("Inconsistent resume analysis");
+    }
+  }
+}
 export class DreamJobDB extends Dexie {
   professionalProfiles!: Table<ProfessionalProfile, string>;
   profileVersions!: Table<ProfessionalProfile & { versionKey: string }, string>;
@@ -118,12 +174,7 @@ export class DreamJobDB extends Dexie {
   }
   async saveResume(input: unknown) {
     const r = savedResumeSchema.parse(input);
-    validateResume(r.resume, r.profile);
-    if (r.analysis) {
-      const { score, ...draft } = r.analysis;
-      if (validateAnalysis(draft, r.profile).score !== score)
-        throw Error("Inconsistent resume analysis");
-    }
+    await validateSavedResume(r);
     await this.resumes.add(r);
     return r;
   }
@@ -141,7 +192,7 @@ export class DreamJobDB extends Dexie {
     return this.transaction("r", this.tables, async () =>
       backupSchema.parse({
         format: "dream-job",
-        version: 1,
+        version: 2,
         exportedAt: new Date().toISOString(),
         professionalProfiles: await this.professionalProfiles.toArray(),
         profileVersions: (await this.profileVersions.toArray()).map(
@@ -155,14 +206,7 @@ export class DreamJobDB extends Dexie {
   }
   async importBackup(raw: unknown) {
     const b = backupSchema.parse(raw);
-    for (const r of b.resumes) {
-      validateResume(r.resume, r.profile);
-      if (r.analysis) {
-        const { score, ...draft } = r.analysis;
-        if (validateAnalysis(draft, r.profile).score !== score)
-          throw Error("Inconsistent resume analysis");
-      }
-    }
+    for (const r of b.resumes) await validateSavedResume(r);
     for (const a of b.jobAnalyses) {
       const { score, ...draft } = a.analysis;
       if (validateAnalysis(draft, a.profile).score !== score)

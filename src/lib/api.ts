@@ -1,5 +1,7 @@
 import {
   endpoints,
+  tailoredResumeSchema,
+  tailoringResponseSchema,
   type Endpoint,
   type ApiInput,
   type ApiOutput,
@@ -118,10 +120,51 @@ export class DreamJobClient {
     return this.call("analyze-job", input);
   }
   generateResume(input: ApiInput<"generate-resume">) {
-    return this.call("generate-resume", input);
+    return this.call("generate-resume", input).then((v) =>
+      this.checked(tailoredResumeSchema, v),
+    );
   }
   refineResume(input: ApiInput<"refine-resume">) {
-    return this.call("refine-resume", input);
+    return this.call("refine-resume", input).then((v) =>
+      this.checked(tailoredResumeSchema, v),
+    );
+  }
+  tailorResume(
+    input: Omit<
+      Extract<ApiInput<"generate-resume">, { formatVersion: 2 }>,
+      "formatVersion"
+    >,
+  ) {
+    return this.call("generate-resume", { ...input, formatVersion: 2 }).then(
+      (v) => this.checked(tailoringResponseSchema, v),
+    );
+  }
+  refineContent(
+    input: Omit<
+      Extract<ApiInput<"refine-resume">, { formatVersion: 2 }>,
+      "formatVersion"
+    >,
+  ) {
+    return this.call("refine-resume", { ...input, formatVersion: 2 }).then(
+      (v) => this.checked(tailoringResponseSchema, v),
+    );
+  }
+  private checked<T>(
+    schema: {
+      safeParse: (
+        v: unknown,
+      ) => { success: true; data: T } | { success: false };
+    },
+    value: unknown,
+  ): T {
+    const parsed = schema.safeParse(value);
+    if (!parsed.success)
+      throw new ClientError(
+        "INVALID_RESPONSE",
+        "The response did not match the requested resume format. No changes were saved.",
+        502,
+      );
+    return parsed.data;
   }
   signInUrl() {
     return `${this.baseUrl}/api/analyze-job`;

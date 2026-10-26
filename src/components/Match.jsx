@@ -6,6 +6,7 @@ export function Match({
   setJob,
   result,
   generate,
+  analyze,
   busy,
   canUse,
   go,
@@ -13,7 +14,7 @@ export function Match({
   return (
     <>
       <p className="lead">
-        Find the overlap between the opportunity and your real experience.
+        Create a resume from your approved facts. Job fit analysis is optional.
       </p>
       <div className="match-layout">
         <div className="panel">
@@ -47,8 +48,21 @@ export function Match({
             }
             onClick={() => generate()}
           >
-            {busy || "✦ Analyze & Generate"}
+            {busy || "✦ Generate resume"}
           </PixelButton>
+          <PixelButton
+            disabled={
+              !!busy || !canUse || !profile.confirmed || job.trim().length < 40
+            }
+            onClick={analyze}
+          >
+            Analyze fit (optional)
+          </PixelButton>
+          {!result && (
+            <PixelButton onClick={() => go("builder")}>
+              Open in CV Builder →
+            </PixelButton>
+          )}
           <p className="muted">
             A match score is an estimated fit indicator, not a prediction of
             hiring success. AI never changes your contacts, dates, or links.
@@ -81,8 +95,8 @@ export function Analysis({ result, go }) {
     <section className="panel analysis" aria-label="Job match analysis">
       <h2>{result.jobTitle}</h2>
       <p className="muted">
-        This analysis reflects the profile used for this resume draft. Generate
-        again to assess later profile changes.
+        This optional estimate reflects the profile used for this analysis. It
+        does not approve resume claims or block tailoring.
       </p>
       <div className="score-line">
         <strong>

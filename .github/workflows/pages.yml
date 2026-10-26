@@ -26,6 +26,9 @@ jobs:
       - run: npm run worker:check
         env:
           WRANGLER_SEND_METRICS: 'false'
+      - run: npm run build:same-origin && npm run worker:check:same-origin && node scripts/check-same-origin.mjs
+        env:
+          WRANGLER_SEND_METRICS: 'false'
       - run: npm run build
         env:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/

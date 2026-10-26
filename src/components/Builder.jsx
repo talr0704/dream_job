@@ -152,6 +152,9 @@ export function Builder({
   sourceJob,
   concise,
   onRefine,
+  requiresReview = false,
+  reviewed = false,
+  reviewPanel = /** @type {import("react").ReactNode} */ (null),
   go,
 }) {
   const [instructions, setInstructions] = useState("");
@@ -176,9 +179,11 @@ export function Builder({
           <PixelButton onClick={() => go("match")}>
             ✦ Go to Job Match
           </PixelButton>
-          <PixelButton onClick={() => setEditing(!editing)}>
-            {editing ? "Done editing" : "Edit resume"}
-          </PixelButton>
+          {!requiresReview && (
+            <PixelButton onClick={() => setEditing(!editing)}>
+              {editing ? "Done editing" : "Edit resume"}
+            </PixelButton>
+          )}
           {!resume.confirmed && (
             <p className="note">
               Confirm your profile in the journal before exporting.{" "}
@@ -243,7 +248,10 @@ export function Builder({
                 : "Measuring layout…"}
             </span>
           </div>
-          {editing && <ResumeEditor resume={resume} setResume={setResume} />}{" "}
+          {reviewPanel}
+          {editing && !requiresReview && (
+            <ResumeEditor resume={resume} setResume={setResume} />
+          )}{" "}
           {layout?.overflow && (
             <div className="note overflow-note">
               Spacing is at its compact limit. Shorten the text or explicitly
@@ -274,6 +282,7 @@ export function Builder({
                 !!busy ||
                 !canUse ||
                 !resume.confirmed ||
+                (requiresReview && !reviewed) ||
                 !layout ||
                 (!twoPages && layout.overflow)
               }

@@ -2,7 +2,7 @@
 
 The approved React pixel world and professional resume template are retained. The active app uses React/Vite/TypeScript, Zod, Dexie/IndexedDB and a **stateless** Cloudflare Worker named **`dream-job-api`**. No Firebase, cloud database, profile server, or new Worker is required. The previous Express/Firebase implementation is archived under `legacy/cloud-run/` for reference. Original JS UI components remain reusable behind typed model adapters.
 
-**Nothing has been deployed by this implementation.** The current production Hello World Worker, existing Access policy, and `OPENAI_API_KEY` secret are untouched. `wrangler deploy --dry-run` only bundles locally. GitHub Actions validates pushes; publication requires its explicit manual frontend-publish input. It never deploys the Worker.
+**This change does not deploy anything.** It targets the existing `dream-job-api` Worker; the existing Access policy and `OPENAI_API_KEY` secret are untouched. `wrangler deploy --dry-run` only bundles locally. GitHub Actions validates pushes; publication requires its explicit manual frontend-publish input. It never deploys the Worker.
 
 ## Local development and validation
 
@@ -26,28 +26,30 @@ Optional `npm run worker:dev` uses local Wrangler with ignored `.dev.vars` (copy
 
 Only these four JSON endpoints are implemented:
 
-| Endpoint | Input | Output |
-| --- | --- | --- |
-| `POST /api/extract-profile` | extracted/pasted text, 20–60,000 characters | unverified profile draft and warnings |
-| `POST /api/analyze-job` | approved profile, description, optional company/title/HTTPS URL | requirements, evidence IDs, strengths/gaps and computed score |
-| `POST /api/generate-resume` | approved profile, description, structured analysis | structured tailored resume with fact IDs |
-| `POST /api/refine-resume` | approved source profile, current structured resume, requested edits | revised resume with source references |
+| Endpoint                    | Input                                                                  | Output                                                        |
+| --------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `POST /api/extract-profile` | extracted/pasted text, 20–60,000 characters                            | unverified profile draft and warnings                         |
+| `POST /api/analyze-job`     | approved profile, description, optional company/title/HTTPS URL        | requirements, evidence IDs, strengths/gaps and computed score |
+| `POST /api/generate-resume` | `formatVersion: 2`, approved profile, description                      | versioned content-only resume and review warnings             |
+| `POST /api/refine-resume`   | `formatVersion: 2`, approved profile, current content, requested edits | revised content and review warnings                           |
 
-`shared/contracts.ts` is the shared runtime/type contract. Profiles include stable IDs for experience, individual achievements, skills, projects, education, certifications, languages and links. Metadata is mapped from source records, never supplied by generated resume text. Claims cite source fact IDs; each employment/project achievement must cite its own record's facts. Numeric claims are checked against cited facts. Skill, education, certification and link IDs must be subsets of the source profile. Model output is strict OpenAI JSON Schema Structured Outputs (`store:false`), Zod-validated, then independently audited by another model request. English and factual entailment are enforced by the generation/audit instructions; model audits are fallible, so review every output. Schema and numeric checks do not prove semantic truth.
+`shared/contracts.ts` is the shared runtime/type contract. The primary workflow is approved profile → **one model call** → content-only JSON → deterministic checks and protected-field assembly → original/rewrite comparison → explicit tailored-resume review → the existing HTML/PDF template. Job analysis is optional and never a prerequisite. No independent model audit or revision loop runs in the new workflow. [Architecture, contracts, migration and limitations](docs/simplified-architecture.md).
+
+Stable profile IDs anchor selections and each rewritten bullet to one approved achievement in its own experience. Identity, titles, employers, dates, education, certifications, links and other protected fields come directly from the saved approved profile. Unknown, duplicate and wrong-parent references reject the response. Focused guards restore original wording with review warnings for unsupported numeric claims, sensitive qualifications and unsafe markup. These checks do not prove semantic truth: review every rewrite. Legacy request contracts remain available for historical clients and retain their existing strict validation and independent audit.
 
 Scoring is deterministic: mandatory weight **3**, preferred weight **1**; met receives **1**, partial **0.5**, no supporting evidence **0**. The model identifies requirements and evidence; application code computes the percentage. “Missing” means evidence is absent in the submitted profile, not that the person lacks the experience. The score estimates fit, not hiring success.
 
 Requests are bounded to 256 KiB, model calls share a 55-second deadline, the client has a 60-second timeout, and outputs are token-bounded. Error bodies use `{error:{code,message,requestId}}`. Codes include `AUTH_REQUIRED`, `ORIGIN_DENIED`, `INVALID_INPUT`, `BODY_TOO_LARGE`, `RATE_LIMITED`, `AI_RATE_LIMITED`, `AI_UNAVAILABLE`, `INVALID_AI_RESPONSE`, `UNSUPPORTED_CLAIM` and `TIMEOUT`. No profile, job, resume, token or provider error body is logged. Provider errors are sanitized.
 
-The native `AI_RATE_LIMITER` binding allows 5 authenticated endpoint requests per 60 seconds. If the binding is missing or fails, paid requests fail closed. Cloudflare rate limiting is approximate and location-scoped, **not a billing cap**. A generation flow calls analysis then resume generation; each endpoint normally makes two model calls including audit. Configure OpenAI project model permissions, rate limits and budget notifications; monitor usage and set suitably low project limits. Provider budget notifications may not stop spending. No paid automatic retries are performed.
+The native `AI_RATE_LIMITER` binding allows 5 authenticated endpoint requests per 60 seconds. If the binding is missing or fails, paid requests fail closed. Cloudflare rate limiting is approximate and location-scoped, **not a billing cap**. The new extraction, optional analysis, tailoring and refinement operations each make one model call. Tailoring does not call analysis. Legacy resume-write requests retain their audit call for compatibility. Configure OpenAI project model permissions, rate limits and budget notifications; monitor usage and set suitably low project limits. Provider budget notifications may not stop spending. No paid automatic retries are performed.
 
 ## Local persistence, backups and document import
 
 Dexie stores: **`professionalProfiles`**, **`profileVersions`**, **`jobAnalyses`**, **`resumes`**, **`settings`**. Schema v2 upgrades v1 indexes without deleting data. Approved profile saves atomically append a new version; stale concurrent-tab saves are rejected. Extraction proposals remain unsaved until the user applies, reviews, approves and saves them. Profile history can be loaded for review and saved as a new version. Tailoring and refinement never mutate the master profile.
 
-Each saved resume stores its original professional profile, generated structure with fact references, analysis, job description, page preference and separately marked manual text. Manual edits are user-authored and are not represented as independently verified AI claims. Reopen, rename/move, duplicate and delete are available in My Resumes. Saved analyses remain in `jobAnalyses`, including when later resume generation fails.
+New version-2 resumes store their approved source-profile snapshot, content selections and rewrites, review warnings, job description, page preference and a digest-bound review record. Editing content clears review. Historical version-1 records retain their original structure, analysis and manual-profile overlays unchanged. Manual edits are user-authored and are not represented as independently verified AI claims. Reopen, rename/move, duplicate and delete are available in My Resumes. Saved analyses remain in `jobAnalyses`, including when later resume generation fails.
 
-The profile screen exports a versioned `dream-job` JSON backup and imports validated backups after a count/confirmation preview. Imports use a single transaction and **add only**: any colliding profile, version, analysis, resume or setting key cancels the entire import. Existing data is never overwritten. Backup format v1 is distinct from the IndexedDB schema version. JSON is bounded to 32 MiB in the UI. Imported structures and saved manual profiles are validated before rendering.
+The profile screen exports a versioned `dream-job` JSON backup and imports validated backups after a count/confirmation preview. Imports use a single transaction and **add only**: any colliding profile, version, analysis, resume or setting key cancels the entire import. Existing data is never overwritten. Backup export now uses format v2, independently of the unchanged IndexedDB schema version. Both v1 and v2 backups can be imported; historical records are not rewritten. JSON is bounded to 32 MiB in the UI. Imported structures and saved manual profiles are validated before rendering.
 
 All persisted workspace data stays in the current browser/origin. Data submitted for AI processing is sent to the Worker and OpenAI. Data is not synchronized or encrypted by Dexie. Clearing browser data/private browsing can remove it. Export a backup before switching browsers or frontend origins; import it at the new origin. Never clear the old copy until the new one has been verified. A previous localStorage profile can be explicitly loaded into the journal for approval; it is never silently imported or deleted.
 
@@ -71,14 +73,14 @@ The existing endpoint is `https://dream-job-api.tal070498.workers.dev`. `wrangle
 
 Before deployment, use the **existing** Cloudflare Access application to obtain its real audience tag and team hostname. No credentials are configured in this execution environment and these values have not been inferred. Set non-secret `vars` in `wrangler.jsonc`:
 
-| Binding | Required value |
-| --- | --- |
-| `OPENAI_MODEL` | configured Structured Outputs capable model; default `gpt-4.1-mini` |
-| `ALLOWED_ORIGIN` | exact deployed frontend HTTPS origin, no path/trailing slash; GitHub Pages repo path is not part of the origin |
-| `ACCESS_AUD` | actual existing Access application audience tag |
-| `ACCESS_TEAM_DOMAIN` | actual team hostname ending `.cloudflareaccess.com`, no scheme/path |
-| `OPENAI_API_KEY` | **existing Worker secret**, never a `vars` entry or `VITE_` variable |
-| `AI_RATE_LIMITER` | native rate-limit binding prepared in config; namespace 1001, 5 requests/minute |
+| Binding              | Required value                                                                                                 |
+| -------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `OPENAI_MODEL`       | configured Structured Outputs capable model; default `gpt-4.1-mini`                                            |
+| `ALLOWED_ORIGIN`     | exact deployed frontend HTTPS origin, no path/trailing slash; GitHub Pages repo path is not part of the origin |
+| `ACCESS_AUD`         | actual existing Access application audience tag                                                                |
+| `ACCESS_TEAM_DOMAIN` | actual team hostname ending `.cloudflareaccess.com`, no scheme/path                                            |
+| `OPENAI_API_KEY`     | **existing Worker secret**, never a `vars` entry or `VITE_` variable                                           |
+| `AI_RATE_LIMITER`    | native rate-limit binding prepared in config; namespace 1001, 5 requests/minute                                |
 
 Keep the existing Access All traffic scope, production/preview protection, account-members Allow policy and 24-hour session. Confirm the active Cloudflare account and Worker first. `wrangler secret list --name dream-job-api` can verify the secret **name** without reading its value; do not recreate it. Wrangler `keep_vars:true` preserves unrelated dashboard variables; configured local vars are still authoritative and must be filled correctly before deployment. Secrets are not defined in source and normal deploy does not replace the existing secret.
 

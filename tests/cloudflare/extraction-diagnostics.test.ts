@@ -7,7 +7,7 @@ import {
   assertStructuredSchema,
 } from "../../worker/ai";
 import { extractResponseSchema } from "../../shared/contracts";
-import { profile, env, identity, mockAI } from "./fixtures";
+import { profile, env, identity, mockAI, resume } from "./fixtures";
 import { DreamJobClient } from "../../src/lib/api";
 import { DreamJobDB } from "../../src/lib/storage";
 const text =
@@ -201,37 +201,24 @@ it.each([
     }
   },
 );
-it("distinguishes failure in the audit call from failure in extraction", async () => {
-  const log = vi.fn();
+it("extraction uses one provider response and no independent model audit", async () => {
   const fetcher = vi
     .fn()
-    .mockResolvedValueOnce(mockAI({ profile: draft, warnings: [] }))
-    .mockResolvedValueOnce(envelope("{broken " + text));
-  const r = await createWorker({ authenticate: identity, fetcher, log }).fetch(
-    request(),
-    env,
-  );
-  expect(r.status).toBe(502);
-  expect(log.mock.calls.map((c) => c[0])).toContainEqual(
-    expect.objectContaining({
-      operation: "audit",
-      phase: "json_parse",
-      code: "INVALID_AI_RESPONSE",
-    }),
-  );
-  expect(fetcher).toHaveBeenCalledTimes(2);
+    .mockResolvedValueOnce(mockAI({ profile: draft, warnings: [] }));
+  const r = await createWorker({
+    authenticate: identity,
+    fetcher,
+    log: () => {},
+  }).fetch(request(), env);
+  expect(r.status).toBe(200);
+  expect(fetcher).toHaveBeenCalledTimes(1);
 });
 it("uses one extraction schema, rejects unsupported schema keywords and keeps semantic checks", () => {
   expect(extractionSchema).toBe(extractResponseSchema);
   const schema: any = structuredSchema(extractionSchema);
   assertStructuredSchema(schema);
-  expect(schema.properties.profile.properties.verified).toMatchObject({
-    enum: [false],
-  });
-  expect(schema.properties.profile.properties.version).toMatchObject({
-    type: "integer",
-    minimum: 1,
-  });
+  for (const field of ["id", "version", "verified", "updatedAt"])
+    expect(schema.properties.profile.properties).not.toHaveProperty(field);
   expect(() =>
     assertStructuredSchema({
       type: "object",
@@ -329,10 +316,14 @@ it("correlates factuality audit rejection without logging audit reasons", async 
   const log = vi.fn();
   const fetcher = vi
     .fn()
-    .mockResolvedValueOnce(mockAI({ profile: draft, warnings: [] }))
+    .mockResolvedValueOnce(mockAI(resume))
     .mockResolvedValueOnce(mockAI({ supported: false, reasons: [text] }));
   const r = await createWorker({ authenticate: identity, fetcher, log }).fetch(
-    request(),
+    new Request("https://api.test/api/refine-resume", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profile, resume, instructions: "Make concise" }),
+    }),
     env,
   );
   expect(r.status).toBe(422);

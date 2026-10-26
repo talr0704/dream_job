@@ -1,14 +1,6 @@
 import { it, expect, vi } from "vitest";
 import { createWorker } from "../../worker/index";
-import {
-  profile,
-  resume,
-  analysis,
-  env,
-  identity,
-  mockAI,
-  auditWithStatuses,
-} from "./fixtures";
+import { profile, resume, analysis, env, identity, mockAI } from "./fixtures";
 import { toJournal } from "../../src/lib/adapter";
 const request = (
   endpoint: string,
@@ -102,24 +94,19 @@ it("extracts unapproved drafts, returns warnings for missing data and audits out
   expect(output.profile.verified).toBe(false);
   expect(output.warnings.join(" ")).toContain("email");
   expect(output.profile.id).not.toBe(profile.id);
-  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(fetcher).toHaveBeenCalledTimes(1);
   const body = JSON.parse(fetcher.mock.calls[0][1].body);
   expect(body.response_format.json_schema.strict).toBe(true);
   expect(body.store).toBe(false);
 });
-it("computes the score and returns grounded analysis after an independent audit", async () => {
+it("computes the score for an optional one-call analysis", async () => {
   const fetcher = vi
     .fn()
     .mockResolvedValueOnce(
       mockAI({
-        ...analysisDraft,
-        requirements: analysisDraft.requirements.map((r) => ({
-          ...r,
-          jobDescriptionQuote: "TypeScript developer",
-        })),
+        requirements: analysisDraft.requirements.map(({ evidence, ...r }) => r),
       }),
-    )
-    .mockResolvedValueOnce(mockAI(auditWithStatuses(analysisDraft)));
+    );
   const r = await createWorker({ authenticate: identity, fetcher }).fetch(
     request("analyze-job", {
       profile,
@@ -268,4 +255,21 @@ it("emits strict Structured Outputs schemas while keeping URL checks in Zod", ()
   };
   visit(schema);
   expect(schema.$schema).toBeUndefined();
+});
+
+it("tailors without requiring a job analysis", async () => {
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(mockAI(resume))
+    .mockResolvedValueOnce(mockAI({ supported: true, reasons: [] }));
+  const r = await createWorker({ authenticate: identity, fetcher }).fetch(
+    request("generate-resume", {
+      profile,
+      jobDescription:
+        "Seeking a TypeScript developer with accessible application experience.",
+    }),
+    env,
+  );
+  expect(r.status).toBe(200);
+  expect(fetcher).toHaveBeenCalledTimes(2);
 });
