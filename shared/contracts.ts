@@ -399,7 +399,7 @@ export const generateRequestSchema = z
   .object({
     profile: verifiedProfileSchema,
     jobDescription,
-    analysis: analysisSchema,
+    analysis: analysisSchema.optional(),
   })
   .strict();
 export const refineRequestSchema = z

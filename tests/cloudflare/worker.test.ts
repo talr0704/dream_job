@@ -269,3 +269,20 @@ it("emits strict Structured Outputs schemas while keeping URL checks in Zod", ()
   visit(schema);
   expect(schema.$schema).toBeUndefined();
 });
+
+it("tailors without requiring a job analysis", async () => {
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(mockAI(resume))
+    .mockResolvedValueOnce(mockAI({ supported: true, reasons: [] }));
+  const r = await createWorker({ authenticate: identity, fetcher }).fetch(
+    request("generate-resume", {
+      profile,
+      jobDescription:
+        "Seeking a TypeScript developer with accessible application experience.",
+    }),
+    env,
+  );
+  expect(r.status).toBe(200);
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});

@@ -205,6 +205,26 @@ function App() {
       return refine(
         "Make this resume more concise without losing factual meaning.",
       );
+    return task("Tailoring your resume…", async () => {
+      if (!master.current)
+        throw Error("Approve your professional profile first.");
+      const p = structuredClone(master.current);
+      const r = await client.generateResume({
+        profile: p,
+        jobDescription: job,
+      });
+      sourceProfile.current = p;
+      resumeAnalysis.current = null;
+      tailored.current = r;
+      setResume(resumeToJournal(p, r));
+      setSourceJob(job);
+      setTwoPages(false);
+      setMessage(
+        "Tailored draft generated. Review every claim before exporting.",
+      );
+    });
+  }
+  async function analyze() {
     return task("Analyzing your fit…", async () => {
       if (!master.current)
         throw Error("Approve your professional profile first.");
@@ -221,20 +241,6 @@ function App() {
         createdAt: new Date().toISOString(),
       });
       setResult(displayAnalysis(analysis, p));
-      const r = await client.generateResume({
-        profile: p,
-        jobDescription: job,
-        analysis,
-      });
-      sourceProfile.current = p;
-      resumeAnalysis.current = analysis;
-      tailored.current = r;
-      setResume(resumeToJournal(p, r));
-      setSourceJob(job);
-      setTwoPages(false);
-      setMessage(
-        "Tailored draft generated. Review every claim before exporting.",
-      );
     });
   }
   async function refine(instructions: string) {
@@ -514,6 +520,7 @@ function App() {
                     setJob={setJob}
                     result={result}
                     generate={generate}
+                    analyze={analyze}
                     busy={busy}
                     canUse={canUse}
                     go={go}

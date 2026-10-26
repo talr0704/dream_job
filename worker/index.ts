@@ -300,7 +300,7 @@ export function createWorker(
         } else {
           context.operation =
             endpoint === "generate-resume" ? "generate" : "refine";
-          if (endpoint === "generate-resume") {
+          if (endpoint === "generate-resume" && input.analysis) {
             const { score, ...draft } = input.analysis;
             const checked = validateAnalysis(draft, input.profile);
             if (score !== checked.score)
@@ -309,7 +309,8 @@ export function createWorker(
                 "Job analysis score is inconsistent.",
                 400,
               );
-          } else validateResume(input.resume, input.profile);
+          } else if (endpoint === "refine-resume")
+            validateResume(input.resume, input.profile);
           const draft = await structured(
             env,
             endpoints["generate-resume"].response,
