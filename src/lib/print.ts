@@ -1,6 +1,8 @@
 import { resumeDocument, fitPaper } from "../../shared/render.js";
 export async function printResume(profile: any, twoPages = false) {
-  // Browser print-to-PDF keeps text and links; no server receives the document.
+  // Keep real anchors and selectable HTML text; the selected browser/print
+  // destination controls the final PDF annotations. Instructions precede export.
+  // No server receives the document.
   const win = window.open("", "_blank");
   if (!win) throw Error("Allow a print window to export your PDF.");
   try {

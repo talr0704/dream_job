@@ -292,8 +292,9 @@ export function Builder({
             </PixelButton>
           </div>
           <p className="export-note">
-            A4 · Searchable text · Clickable links · Approved professional
-            template
+            Choose your browser’s built-in “Save as PDF”, A4, no headers or
+            footers, and background graphics. Check links in the saved file;
+            print preview may not activate them. Missing URLs are never added.
           </p>
         </section>
       </div>
