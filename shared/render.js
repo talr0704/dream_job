@@ -61,6 +61,10 @@ export function fitPaper() {
     density: paper.dataset.density,
   };
 }
+// The same unchanged one/two-page limits apply to preview and export.
+export function exceedsPageLimit(layout, twoPages = false) {
+  return twoPages ? layout.height > layout.limit * 2 - 8 : layout.overflow;
+}
 export function resumeDocument(p, options) {
   return `<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><style>${templateCSS}</style></head><body>${renderResume(p, options)}</body></html>`;
 }

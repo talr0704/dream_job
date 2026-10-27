@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { resumeDocument, fitPaper } from "../../shared/render.js";
+import {
+  resumeDocument,
+  fitPaper,
+  exceedsPageLimit,
+} from "../../shared/render.js";
 import { PixelButton, Field } from "./World.jsx";
 export function ResumePreview({ resume, twoPages, onLayout }) {
   const [actualSize, setActualSize] = useState(false);
@@ -9,9 +13,13 @@ export function ResumePreview({ resume, twoPages, onLayout }) {
     () => resumeDocument(resume, { pages: twoPages ? "two" : "one" }),
     [resume, twoPages],
   );
-  function measure() {
+  async function measure() {
     const iframe = frame.current;
-    if (!iframe?.contentDocument?.querySelector(".paper")) return;
+    const doc = iframe?.contentDocument;
+    if (!doc?.querySelector(".paper")) return;
+    await doc.fonts.ready;
+    // Ignore font/load callbacks from documents replaced by a newer edit.
+    if (frame.current !== iframe || iframe.contentDocument !== doc) return;
     const layout = iframe.contentWindow.Function(
       "return (" + fitPaper.toString() + ")()",
     )();
@@ -33,7 +41,7 @@ export function ResumePreview({ resume, twoPages, onLayout }) {
     const observer = new ResizeObserver(measure);
     observer.observe(viewport.current);
     return () => observer.disconnect();
-  }, [actualSize]);
+  }, [actualSize, source]);
   return (
     <>
       <div className="zoom-controls">
@@ -56,12 +64,10 @@ export function ResumePreview({ resume, twoPages, onLayout }) {
         <div className="paper-stage">
           <iframe
             title="Resume preview"
+            key={source}
             ref={frame}
             srcDoc={source}
-            onLoad={() => {
-              measure();
-              frame.current?.contentDocument.fonts.ready.then(measure);
-            }}
+            onLoad={measure}
           />
         </div>
       </div>
@@ -152,6 +158,7 @@ export function Builder({
   sourceJob,
   concise,
   onRefine,
+  onLayoutValidated = () => {},
   requiresReview = false,
   reviewed = false,
   reviewPanel = /** @type {import("react").ReactNode} */ (null),
@@ -159,9 +166,19 @@ export function Builder({
 }) {
   const [instructions, setInstructions] = useState("");
   const [editing, setEditing] = useState(false),
-    [layout, setLayout] = useState(null),
+    [measurement, setMeasurement] = useState(null),
     [title, setTitle] = useState(""),
     [folder, setFolder] = useState("");
+  // A layout belongs to an exact resume object and page selection, never the
+  // preceding iframe document while a new srcDoc is loading.
+  const layout =
+    measurement?.resume === resume && measurement?.twoPages === twoPages
+      ? measurement.layout
+      : null;
+  function measured(next) {
+    setMeasurement({ resume, twoPages, layout: next });
+    if (!exceedsPageLimit(next, twoPages)) onLayoutValidated();
+  }
   return (
     <>
       <p className="lead">
@@ -266,7 +283,7 @@ export function Builder({
           <ResumePreview
             resume={resume}
             twoPages={twoPages}
-            onLayout={setLayout}
+            onLayout={measured}
           />
           <div className="export-bar">
             <label className="check">
@@ -282,9 +299,7 @@ export function Builder({
                 !!busy ||
                 !canUse ||
                 !resume.confirmed ||
-                (requiresReview && !reviewed) ||
-                !layout ||
-                (!twoPages && layout.overflow)
+                (requiresReview && !reviewed)
               }
               onClick={() => download(resume, twoPages)}
             >

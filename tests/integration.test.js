@@ -85,3 +85,30 @@ test("moderate overflow exports two pages only when requested", async () => {
   assert.equal(info.count, 2);
   assert.ok(info.text.includes("Technical solutions"));
 });
+
+test("fitPaper resets prior overflow after text edits and the shortened model exports one A4 page", async () => {
+  const browser = await getBrowser();
+  const page = await browser.newPage();
+  try {
+    await page.setContent(
+      resumeDocument({ ...p, summary: Array(18).fill(p.summary).join(" ") }),
+    );
+    assert.equal((await page.evaluate(fitPaper)).overflow, true);
+    await page.locator(".section:first-child .content p").evaluate((node) => {
+      node.textContent = "Technical solutions developer.";
+    });
+    const recovered = await page.evaluate(fitPaper);
+    assert.equal(recovered.overflow, false);
+    const repeated = await page.evaluate(fitPaper);
+    assert.ok(Math.abs(repeated.height - recovered.height) < 1);
+    assert.equal(repeated.overflow, false);
+    const info = await pdfInfo(
+      await exportPDF({ ...p, summary: "Technical solutions developer." }),
+    );
+    assert.equal(info.count, 1);
+    assert.ok(info.text.includes("Technical solutions developer."));
+    assert.ok(info.links.some((link) => link.url?.startsWith("mailto:")));
+  } finally {
+    await page.close();
+  }
+});

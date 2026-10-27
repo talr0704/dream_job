@@ -10,7 +10,7 @@ import {
   resumeProfile,
   safeURL,
 } from "../shared/model.js";
-import { renderResume } from "../shared/render.js";
+import { renderResume, exceedsPageLimit } from "../shared/render.js";
 test("profile validates and remains unconfirmed until reviewed", () => {
   assert.equal(profileSchema.parse(profile).confirmed, false);
 });
@@ -73,4 +73,23 @@ test("template escapes hostile text and never emits placeholder links", () => {
   assert.ok(html.includes("&lt;script&gt;"));
   assert.ok(!html.includes("[MindplayCode]"));
   assert.ok(html.includes("mailto:tal.rozen01@gmail.com"));
+});
+
+test("shared page limits retain strict one-page and two-page boundaries", () => {
+  assert.equal(
+    exceedsPageLimit({ overflow: true, height: 1101, limit: 1100 }),
+    true,
+  );
+  assert.equal(
+    exceedsPageLimit({ overflow: false, height: 1099, limit: 1100 }),
+    false,
+  );
+  assert.equal(
+    exceedsPageLimit({ overflow: true, height: 2192, limit: 1100 }, true),
+    false,
+  );
+  assert.equal(
+    exceedsPageLimit({ overflow: true, height: 2192.1, limit: 1100 }, true),
+    true,
+  );
 });
