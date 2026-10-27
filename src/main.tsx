@@ -39,7 +39,7 @@ import {
   guardContent,
 } from "../shared/tailoring";
 import { extractDocumentText } from "./lib/documents";
-import { printResume } from "./lib/print";
+import { printResume, A4OverflowError } from "./lib/print";
 import {
   destinations,
   World,
@@ -94,6 +94,14 @@ function App() {
     [contentWarnings, setContentWarnings] = useState<string[]>([]),
     [review, setReview] = useState<SavedResumeV2["review"]>(null);
   const contentRef = useRef<ResumeContent | null>(null);
+  const exportOverflow = useRef<A4OverflowError | null>(null);
+  function clearValidatedOverflow() {
+    const previous = exportOverflow.current;
+    if (!previous) return;
+    // Never clear an unrelated error merely because the resume happens to fit.
+    setError((current) => (current === previous.message ? "" : current));
+    exportOverflow.current = null;
+  }
   const master = useRef<ProfessionalProfile | null>(null),
     sourceProfile = useRef<ProfessionalProfile | null>(null),
     tailored = useRef<TailoredResume | null>(null),
@@ -155,12 +163,14 @@ function App() {
   }
   async function task(label: string, fn: () => Promise<void>) {
     setBusy(label);
+    exportOverflow.current = null;
     setError("");
     setMessage("");
     try {
       await fn();
       return true;
     } catch (e) {
+      exportOverflow.current = e instanceof A4OverflowError ? e : null;
       setError(e instanceof Error ? e.message : "Operation failed");
       return false;
     } finally {
@@ -308,13 +318,15 @@ function App() {
   async function download(p: any, pages = false) {
     return task("Rendering PDF…", async () => {
       if (contentRef.current && sourceProfile.current) {
-        if (
-          !review ||
-          review.digest !==
-            (await contentDigest(sourceProfile.current, contentRef.current))
-        )
+        const current = contentRef.current,
+          source = sourceProfile.current;
+        if (!review || review.digest !== (await contentDigest(source, current)))
           throw Error("Review this tailored resume before exporting.");
-        p = contentToJournal(sourceProfile.current, contentRef.current);
+        if (contentRef.current !== current || sourceProfile.current !== source)
+          throw Error(
+            "Resume changed during validation. Review the latest edits and export again.",
+          );
+        p = contentToJournal(source, current);
       }
       profileSchema.parse(p);
       await printResume(p, pages);
@@ -648,6 +660,7 @@ function App() {
                 {screen === "builder" && (
                   <Builder
                     onRefine={refine}
+                    onLayoutValidated={clearValidatedOverflow}
                     resume={resume}
                     setResume={setResume}
                     requiresReview={!!content}
