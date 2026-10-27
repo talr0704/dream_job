@@ -318,9 +318,7 @@ function App() {
       }
       profileSchema.parse(p);
       await printResume(p, pages);
-      setMessage(
-        "Choose Save as PDF, A4, no browser headers/footers, and background graphics in the print dialog.",
-      );
+      setMessage("Check the saved PDF and its links before sending it.");
     });
   }
   async function saveVersion(title: string, folder: string) {
