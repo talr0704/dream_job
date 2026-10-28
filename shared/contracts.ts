@@ -319,8 +319,15 @@ export const tailoredResumeSchema = z
 export type TailoredResume = z.infer<typeof tailoredResumeSchema>;
 // Small content-only DTO. The array shape permits future same-experience merges;
 // version 2 deliberately allows exactly one approved achievement per bullet.
+const evidenceReference = z.string().min(1).max(2048);
+const evidenceReferences = z.array(evidenceReference).min(1).max(20);
 export const resumeContentSchema = z
   .object({
+    headline: z
+      .object({ text: nonempty, sourceFactIds: evidenceReferences })
+      .strict()
+      .optional(),
+    summarySourceFactIds: evidenceReferences.optional(),
     summary: nonempty.describe(
       "Job-specific summary of supported approved capabilities; no invented title, seniority or qualifications.",
     ),
@@ -351,6 +358,7 @@ export const resumeContentSchema = z
         z
           .object({
             projectId: id,
+            sourceFactIds: evidenceReferences.optional(),
             description: nonempty.describe(
               "Emphasize the approved project's aspects relevant to the job without adding facts.",
             ),
@@ -474,6 +482,7 @@ export const legacyRefineRequestSchema = z
 export const contentGenerateRequestSchema = z
   .object({
     formatVersion: z.literal(2),
+    strategy: z.literal("evidence").optional(),
     profile: verifiedProfileSchema,
     jobDescription,
   })
@@ -481,6 +490,7 @@ export const contentGenerateRequestSchema = z
 export const contentRefineRequestSchema = z
   .object({
     formatVersion: z.literal(2),
+    strategy: z.literal("evidence").optional(),
     profile: verifiedProfileSchema,
     content: resumeContentSchema,
     jobDescription: jobDescription.optional(),

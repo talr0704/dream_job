@@ -16,6 +16,7 @@ import {
 } from "./ai";
 import { analyzeJob } from "./job-analysis";
 import { tailor } from "./tailoring";
+import { tailorFromEvidence } from "./evidence-tailoring";
 import { ApiError } from "./errors";
 import { optionalUrlReviewWarnings, extractionInstruction } from "./extraction";
 import {
@@ -294,7 +295,11 @@ export function createWorker(
         } else if (input.formatVersion === 2) {
           context.operation =
             endpoint === "generate-resume" ? "generate" : "refine";
-          output = await tailor(
+          if (input.strategy === "evidence")
+            headers["X-Dream-Job-Engine"] = "evidence-v1";
+          output = await (
+            input.strategy === "evidence" ? tailorFromEvidence : tailor
+          )(
             env,
             input.profile,
             input.jobDescription,

@@ -23,6 +23,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install-deps chromium
       - run: npm test && npm run test:legacy && npm run test:integration && npm run test:ui
+      - run: node scripts/evaluate-tailoring.mjs
       - run: npm run worker:check
         env:
           WRANGLER_SEND_METRICS: 'false'

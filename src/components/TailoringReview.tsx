@@ -3,6 +3,7 @@ import {
   type ResumeContent,
   type ProfessionalProfile,
 } from "../../shared/contracts";
+import { evidenceCatalog } from "../../shared/evidence";
 import { baseContent } from "../../shared/tailoring";
 export function TailoringReview({
   profile,
@@ -21,6 +22,49 @@ export function TailoringReview({
   busy: boolean;
   warnings: string[];
 }) {
+  const evidence = evidenceCatalog(profile);
+  const sourceList = (
+    ids: string[],
+    eligible = evidence,
+    edit?: (ids: string[]) => void,
+  ) => (
+    <>
+      <ul>
+        {ids.map((id) => (
+          <li key={id}>{evidence.find((e) => e.id === id)?.text}</li>
+        ))}
+      </ul>
+      {edit && (
+        <details>
+          <summary>Correct the approved sources for this wording</summary>
+          <p>
+            Sources were selected automatically. Adjust them only when
+            correcting this draft; this never changes your profile.
+          </p>
+          {eligible.map((fact) => (
+            <label className="check" key={fact.id}>
+              <input
+                type="checkbox"
+                checked={ids.includes(fact.id)}
+                disabled={
+                  busy ||
+                  (ids.includes(fact.id) ? ids.length === 1 : ids.length >= 20)
+                }
+                onChange={(event) =>
+                  edit(
+                    event.target.checked
+                      ? [...ids, fact.id]
+                      : ids.filter((id) => id !== fact.id),
+                  )
+                }
+              />
+              {fact.text}
+            </label>
+          ))}
+        </details>
+      )}
+    </>
+  );
   const change = (fn: (c: ResumeContent) => void) => {
     const c = structuredClone(content);
     fn(c);
@@ -33,19 +77,48 @@ export function TailoringReview({
     >
       <h2>Compare with your approved profile</h2>
       <p>
-        Profile facts and this resume's review are separate. Name, headline,
-        contacts, employers, titles, dates, education, certifications and links
-        are copied from this approved profile version. Change factual
-        information in My Profile, not in this draft.
+        Your complete draft is generated automatically. Review and correct it
+        here; you do not need to decide the AI's selections first. Name,
+        contacts, employment titles, employers, dates, education, certifications
+        and links remain approved facts. A capability-based headline can differ
+        from your master headline without changing any employment title.
       </p>
       {warnings.map((w, i) => (
         <p className="note" key={i}>
           {w}
         </p>
       ))}
+      {content.headline && (
+        <details open>
+          <summary>Professional positioning</summary>
+          <p>Master profile headline: {profile.headline}</p>
+          <label className="form-field">
+            Tailored headline
+            <textarea
+              value={content.headline.text}
+              onChange={(e) =>
+                change((c) => {
+                  c.headline!.text = e.target.value;
+                })
+              }
+            />
+          </label>
+          {sourceList(content.headline.sourceFactIds, evidence, (ids) =>
+            change((c) => {
+              c.headline!.sourceFactIds = ids;
+            }),
+          )}
+        </details>
+      )}
       <details open>
         <summary>Summary: approved source and draft</summary>
         <p>{profile.summary}</p>
+        {content.summarySourceFactIds &&
+          sourceList(content.summarySourceFactIds, evidence, (ids) =>
+            change((c) => {
+              c.summarySourceFactIds = ids;
+            }),
+          )}
         <label className="form-field">
           Tailored summary
           <textarea
@@ -59,7 +132,9 @@ export function TailoringReview({
         </label>
       </details>
       <fieldset>
-        <legend>Approved skills to include</legend>
+        <legend>
+          Automatically selected approved skills (optional corrections)
+        </legend>
         {profile.skills.map((s) => (
           <label className="check" key={s.id}>
             <input
@@ -180,6 +255,19 @@ export function TailoringReview({
               Approved project:{" "}
               {[p.description, ...p.achievements.map((a) => a.text)].join(" ")}
             </p>
+            {selected?.sourceFactIds &&
+              sourceList(
+                selected.sourceFactIds,
+                evidence.filter(
+                  (e) => e.kind === "project" && e.parentId === p.id,
+                ),
+                (ids) =>
+                  change((c) => {
+                    c.projects.find(
+                      (project) => project.projectId === p.id,
+                    )!.sourceFactIds = ids;
+                  }),
+              )}
             <label className="check">
               <input
                 type="checkbox"
