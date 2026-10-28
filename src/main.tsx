@@ -287,6 +287,7 @@ function App() {
         const r = await client.refineContent({
           profile: sourceProfile.current,
           content: contentRef.current,
+          jobDescription: sourceJob || undefined,
           instructions,
         });
         contentRef.current = r.content;
