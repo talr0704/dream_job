@@ -9,6 +9,7 @@ export function contentToJournal(p: ProfessionalProfile, raw: ResumeContent) {
     j = toJournal(p);
   return {
     ...j,
+    headline: c.headline?.text || j.headline,
     summary: c.summary,
     skills: c.skillIds.map((id) => p.skills.find((s) => s.id === id)!.text),
     employment: c.experience.map((e) => ({

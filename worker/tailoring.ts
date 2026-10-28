@@ -7,6 +7,16 @@ import { guardContent } from "../shared/tailoring";
 import { structured, type AIEnv } from "./ai";
 import { type DiagnosticContext, recordFailure } from "./diagnostics";
 import { ApiError } from "./errors";
+// The compatibility writer retains its original provider shape. Storage/readers
+// accept evidence extensions; optional storage fields are not provider fields.
+const compatibilityWriterSchema = resumeContentSchema
+  .omit({ headline: true, summarySourceFactIds: true })
+  .extend({
+    projects: resumeContentSchema.shape.projects.element
+      .omit({ sourceFactIds: true })
+      .array()
+      .max(10),
+  });
 const instruction = `Write a factually grounded, job-specific English resume, not merely a selection or reordering of the original sentences.
 Use the jobDescription's actual responsibilities, outcomes and priorities to decide what deserves emphasis. In this SAME call, identify the relevant approved evidence, select and order it, and rewrite the summary, selected experience bullets and project descriptions around that evidence. Do not return analysis, reasoning or a match score.
 For each selected achievement, choose the aspect most relevant to the target responsibilities and restructure the sentence to make that aspect clear: the supported action, audience, method, deliverable or result. Use role-relevant terminology only where it accurately describes the cited fact. Improve clarity and relevance rather than swapping synonyms or stuffing keywords. Copy original wording only when it is already the clearest relevant statement or no faithful rewrite is possible. Do not force cosmetic differences or a rewrite quota.
@@ -26,7 +36,7 @@ export async function tailor(
   const checkedCurrent = current ? guardContent(current, p) : undefined;
   const raw = await structured(
     env,
-    resumeContentSchema,
+    compatibilityWriterSchema,
     instruction,
     {
       approved: {

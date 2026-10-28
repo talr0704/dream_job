@@ -24,6 +24,8 @@ Optional `npm run worker:dev` uses local Wrangler with ignored `.dev.vars` (copy
 
 ## API and factual grounding
 
+The current frontend uses **evidence-ranked composition**: job priorities → approved fact/project-detail retrieval → deterministic skill ordering and capability headline → one structured writing call → scoped guards → review → the existing PDF template. Generation starts from the approved profile, not a previous resume. [Architecture, semantic evaluation, compatibility and live-evaluation instructions](docs/evidence-ranked-tailoring.md).
+
 Only these four JSON endpoints are implemented:
 
 | Endpoint                    | Input                                                                  | Output                                                        |
@@ -33,7 +35,7 @@ Only these four JSON endpoints are implemented:
 | `POST /api/generate-resume` | `formatVersion: 2`, approved profile, description                      | versioned content-only resume and review warnings             |
 | `POST /api/refine-resume`   | `formatVersion: 2`, approved profile, current content, requested edits | revised content and review warnings                           |
 
-`shared/contracts.ts` is the shared runtime/type contract. The primary workflow is approved profile → **one model call** → content-only JSON → deterministic checks and protected-field assembly → original/rewrite comparison → explicit tailored-resume review → the existing HTML/PDF template. Job analysis is optional and never a prerequisite. No independent model audit or revision loop runs in the new workflow. [Architecture, contracts, migration and limitations](docs/simplified-architecture.md).
+`shared/contracts.ts` is the shared runtime/type contract. The primary workflow is approved profile → deterministic evidence retrieval → **one model call** → content-only JSON → deterministic checks and protected-field assembly → original/rewrite comparison → explicit tailored-resume review → the existing HTML/PDF template. Job analysis is optional and never a prerequisite. No independent model audit or revision loop runs in the new workflow. [Architecture, contracts, migration and limitations](docs/simplified-architecture.md).
 
 Stable profile IDs anchor selections and each rewritten bullet to one approved achievement in its own experience. Identity, titles, employers, dates, education, certifications, links and other protected fields come directly from the saved approved profile. Unknown, duplicate and wrong-parent references reject the response. Focused guards restore original wording with review warnings for unsupported numeric claims, sensitive qualifications and unsafe markup. These checks do not prove semantic truth: review every rewrite. Legacy request contracts remain available for historical clients and retain their existing strict validation and independent audit.
 

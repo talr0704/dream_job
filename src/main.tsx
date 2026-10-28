@@ -245,7 +245,11 @@ function App() {
       if (!master.current)
         throw Error("Approve your professional profile first.");
       const p = structuredClone(master.current);
-      const r = await client.tailorResume({ profile: p, jobDescription: job });
+      const r = await client.tailorResume({
+        profile: p,
+        jobDescription: job,
+        strategy: "evidence",
+      });
       sourceProfile.current = p;
       resumeAnalysis.current = null;
       tailored.current = null;
@@ -288,6 +292,7 @@ function App() {
           profile: sourceProfile.current,
           content: contentRef.current,
           jobDescription: sourceJob || undefined,
+          strategy: "evidence",
           instructions,
         });
         contentRef.current = r.content;

@@ -1,3 +1,4 @@
+import { evidenceCatalog } from "./evidence";
 import {
   resumeContentSchema,
   verifiedProfileSchema,
@@ -33,6 +34,26 @@ export function validateContent(
   }
   if (c.projects.some((v) => !p.projects.some((s) => s.id === v.projectId)))
     throw Error("Unknown approved project");
+  const evidence = new Map(evidenceCatalog(p).map((e) => [e.id, e]));
+  const refs = (ids: string[]) => {
+    unique(ids);
+    if (ids.some((id) => !evidence.has(id)))
+      throw Error("Unknown approved evidence reference");
+  };
+  if (c.headline) refs(c.headline.sourceFactIds);
+  if (c.summarySourceFactIds) refs(c.summarySourceFactIds);
+  for (const project of c.projects)
+    if (project.sourceFactIds) {
+      refs(project.sourceFactIds);
+      if (
+        project.sourceFactIds.some(
+          (id) =>
+            evidence.get(id)?.parentId !== project.projectId ||
+            evidence.get(id)?.kind !== "project",
+        )
+      )
+        throw Error("Project evidence belongs to another record");
+    }
   return c;
 }
 export function baseContent(p: ProfessionalProfile): ResumeContent {
@@ -60,11 +81,20 @@ export type RewriteIssue =
   | "UNSUPPORTED_QUANTITY"
   | "UNSUPPORTED_LINK"
   | "UNSUPPORTED_QUALIFICATION_OR_RESPONSIBILITY"
-  | "UNSAFE_MARKUP";
+  | "UNSAFE_MARKUP"
+  | "UNSUPPORTED_CAPABILITY"
+  | "UNSUPPORTED_ROLE_CLAIM";
 export function rewriteIssue(
   text: string,
   source: string,
 ): RewriteIssue | undefined {
+  // Named requirements are never transferable merely because they appear in a job.
+  for (const pattern of [
+    /\bwordpress\b/i,
+    /\bseo\b|search.engine.optimi[sz]ation/i,
+  ])
+    if (pattern.test(text) && !pattern.test(source))
+      return "UNSUPPORTED_CAPABILITY";
   const tokens = (s: string) =>
     s
       .toLowerCase()
@@ -103,7 +133,12 @@ export function guardContent(raw: unknown, p: ProfessionalProfile) {
     fallback: string,
     label: string,
   ) => {
-    const issue = rewriteIssue(text, source);
+    const issue =
+      /\b(?:product manager|product management professional|product management experience|worked as (?:a )?pm|served as (?:a )?pm)\b/i.test(
+        text,
+      ) && !p.experience.some((e) => /\bproduct manager\b/i.test(e.title))
+        ? "UNSUPPORTED_ROLE_CLAIM"
+        : rewriteIssue(text, source);
     if (!issue) return text;
     warnings.push(
       `${label}: original approved wording retained because the rewrite failed a focused factuality check (${issue}). Review before approving.`,
@@ -121,7 +156,35 @@ export function guardContent(raw: unknown, p: ProfessionalProfile) {
     languages: p.languages,
     achievements: p.achievements,
   });
-  c.summary = guard(c.summary, professionalSource, p.summary, "Summary");
+  const catalog = new Map(evidenceCatalog(p).map((e) => [e.id, e.text]));
+  const cited = (ids: string[]) => ids.map((id) => catalog.get(id)!).join(" ");
+  const sourceFallback = (ids: string[]) => {
+    let result = "";
+    for (const id of ids) {
+      const text = catalog.get(id)!;
+      const next = result ? result + " " + text : text;
+      if (next.length <= 3000) result = next;
+    }
+    if (!result)
+      throw Error("No complete approved fact fits the content limit");
+    return result;
+  };
+  if (c.headline)
+    c.headline.text = guard(
+      c.headline.text,
+      cited(c.headline.sourceFactIds),
+      p.headline,
+      "Headline",
+    );
+  const summarySource = c.summarySourceFactIds
+    ? cited(c.summarySourceFactIds)
+    : professionalSource;
+  c.summary = guard(
+    c.summary,
+    summarySource,
+    c.summarySourceFactIds ? sourceFallback(c.summarySourceFactIds) : p.summary,
+    "Summary",
+  );
   c.experience.forEach((e, i) => {
     const source = p.experience.find((v) => v.id === e.experienceId)!;
     e.bullets.forEach((b, k) => {
@@ -144,8 +207,8 @@ export function guardContent(raw: unknown, p: ProfessionalProfile) {
         .join(" ") || source.name;
     v.description = guard(
       v.description,
-      JSON.stringify(source),
-      original,
+      v.sourceFactIds ? cited(v.sourceFactIds) : JSON.stringify(source),
+      v.sourceFactIds ? sourceFallback(v.sourceFactIds) : original,
       `Project ${i + 1}`,
     );
   });
