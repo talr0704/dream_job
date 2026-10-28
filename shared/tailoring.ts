@@ -56,19 +56,31 @@ export function baseContent(p: ProfessionalProfile): ResumeContent {
   };
 }
 // High-signal checks, not a semantic proof of arbitrary English paraphrases.
-export function checkRewrite(text: string, source: string): boolean {
+export type RewriteIssue =
+  | "UNSUPPORTED_QUANTITY"
+  | "UNSUPPORTED_LINK"
+  | "UNSUPPORTED_QUALIFICATION_OR_RESPONSIBILITY"
+  | "UNSAFE_MARKUP";
+export function rewriteIssue(
+  text: string,
+  source: string,
+): RewriteIssue | undefined {
   const tokens = (s: string) =>
     s
       .toLowerCase()
+      // Equivalent notation only: never equate percentage points with percent,
+      // convert units, or change quantities. Returned text is left untouched.
+      .replace(/(\d)\s*(?:percent|per cent)\b/g, "$1%")
       .match(
-        /\b\d+(?:[.,]\d+)*(?:\s*(?:%|years?|months?|ms|seconds?|hours?|million|billion))?/g,
+        /\b\d+(?:[.,]\d+)*(?:\s*(?:%|percentage\s+points?|years?|months?|ms|seconds?|hours?|million|billion))?/g,
       ) || [];
   const normalize = (s: string) => s.replace(/\s+/g, "").toLowerCase();
   const allowed = new Set(tokens(source).map(normalize));
-  if (tokens(text).some((v) => !allowed.has(normalize(v)))) return false;
+  if (tokens(text).some((v) => !allowed.has(normalize(v))))
+    return "UNSUPPORTED_QUANTITY";
   const entities =
     text.match(/https?:\/\/[^\s]+|[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi) || [];
-  if (entities.some((v) => !source.includes(v))) return false;
+  if (entities.some((v) => !source.includes(v))) return "UNSUPPORTED_LINK";
   const protectedTerms =
     text.match(
       /\b(?:PhD|MBA|MSc|BSc|certified|certification|senior|led|managed|director|chief|CTO|CEO)\b/gi,
@@ -76,8 +88,11 @@ export function checkRewrite(text: string, source: string): boolean {
   if (
     protectedTerms.some((v) => !new RegExp("\\b" + v + "\\b", "i").test(source))
   )
-    return false;
-  return !/<\/?[a-z][^>]*>/i.test(text);
+    return "UNSUPPORTED_QUALIFICATION_OR_RESPONSIBILITY";
+  if (/<\/?[a-z][^>]*>/i.test(text)) return "UNSAFE_MARKUP";
+}
+export function checkRewrite(text: string, source: string): boolean {
+  return rewriteIssue(text, source) === undefined;
 }
 export function guardContent(raw: unknown, p: ProfessionalProfile) {
   const c = validateContent(raw, p);
@@ -88,9 +103,10 @@ export function guardContent(raw: unknown, p: ProfessionalProfile) {
     fallback: string,
     label: string,
   ) => {
-    if (checkRewrite(text, source)) return text;
+    const issue = rewriteIssue(text, source);
+    if (!issue) return text;
     warnings.push(
-      `${label}: original approved wording retained because the rewrite failed a focused factuality check. Review before approving.`,
+      `${label}: original approved wording retained because the rewrite failed a focused factuality check (${issue}). Review before approving.`,
     );
     return fallback;
   };

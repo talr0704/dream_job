@@ -321,7 +321,9 @@ export type TailoredResume = z.infer<typeof tailoredResumeSchema>;
 // version 2 deliberately allows exactly one approved achievement per bullet.
 export const resumeContentSchema = z
   .object({
-    summary: nonempty,
+    summary: nonempty.describe(
+      "Job-specific summary of supported approved capabilities; no invented title, seniority or qualifications.",
+    ),
     skillIds: z.array(id).min(1).max(100),
     experience: z
       .array(
@@ -333,7 +335,9 @@ export const resumeContentSchema = z
                 z
                   .object({
                     sourceAchievementIds: z.array(id).length(1),
-                    text: nonempty,
+                    text: nonempty.describe(
+                      "Faithful role-specific rewrite of the single cited achievement, preserving its metrics, scope and responsibility level.",
+                    ),
                   })
                   .strict(),
               )
@@ -343,7 +347,16 @@ export const resumeContentSchema = z
       )
       .max(10),
     projects: z
-      .array(z.object({ projectId: id, description: nonempty }).strict())
+      .array(
+        z
+          .object({
+            projectId: id,
+            description: nonempty.describe(
+              "Emphasize the approved project's aspects relevant to the job without adding facts.",
+            ),
+          })
+          .strict(),
+      )
       .max(10),
   })
   .strict();
@@ -470,6 +483,7 @@ export const contentRefineRequestSchema = z
     formatVersion: z.literal(2),
     profile: verifiedProfileSchema,
     content: resumeContentSchema,
+    jobDescription: jobDescription.optional(),
     instructions: z.string().trim().min(3).max(6000),
   })
   .strict();
