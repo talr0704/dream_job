@@ -70,7 +70,7 @@ test("different jobs replace current wording and save distinct drafts; refinemen
     ).not.toBeChecked();
     await page.getByLabel("Resume version name").fill(sample.role);
     await page
-      .getByRole("button", { name: "▣ Save new version", exact: true })
+      .getByRole("button", { name: "▣ Save draft copy", exact: true })
       .click();
   }
   // Reopen an older role after generating others: never reuse the last bullets.

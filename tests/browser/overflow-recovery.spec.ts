@@ -40,7 +40,9 @@ test("an overflowing historical resume recovers after edits and clears its stale
   await page.getByRole("button", { name: "My Resumes", exact: true }).click();
   await page.getByRole("button", { name: "Open & edit", exact: true }).click();
   await expect(page.locator(".overflow-note")).toBeVisible();
-  await page.getByRole("button", { name: "Export PDF ↓", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Print / Save as PDF", exact: true })
+    .click();
   await expect(page.getByRole("alert")).toContainText(
     "Content exceeds the selected A4 page limit",
   );
@@ -54,7 +56,7 @@ test("an overflowing historical resume recovers after edits and clears its stale
   await expect(page.locator(".overflow-note")).toHaveCount(0);
   await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "Export PDF ↓", exact: true }),
+    page.getByRole("button", { name: "Print / Save as PDF", exact: true }),
   ).toBeEnabled();
   await page.context().addInitScript(() => {
     window.print = () => {
@@ -62,7 +64,9 @@ test("an overflowing historical resume recovers after edits and clears its stale
     };
   });
   const popupPromise = page.waitForEvent("popup");
-  await page.getByRole("button", { name: "Export PDF ↓", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Print / Save as PDF", exact: true })
+    .click();
   const popup = await popupPromise;
   await expect(popup.locator("html")).toHaveAttribute("data-printed", "yes");
   await expect(popup.locator(".project p")).toHaveText(
@@ -84,7 +88,9 @@ test("an overflowing historical resume recovers after edits and clears its stale
     .getByRole("textbox", { name: "Project 1", exact: true })
     .fill(longProfile.projects[0].description);
   await expect(page.locator(".overflow-note")).toBeVisible();
-  await page.getByRole("button", { name: "Export PDF ↓", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Print / Save as PDF", exact: true })
+    .click();
   await expect(page.getByRole("alert")).toContainText(
     "Content exceeds the selected A4 page limit",
   );
@@ -149,24 +155,36 @@ test("tailored content removal revalidates layout but still requires fresh user 
   await page.getByRole("button", { name: "Open & edit", exact: true }).click();
   await expect(page.locator(".overflow-note")).toBeVisible();
   // A cached preview may warn, but must not prevent a fresh export validation.
-  await page.getByRole("button", { name: "Export PDF ↓", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Print / Save as PDF", exact: true })
+    .click();
   await expect(page.getByRole("alert")).toContainText(
     "Content exceeds the selected A4 page limit",
   );
-  for (const project of longProfile.projects)
+  for (const project of longProfile.projects) {
+    const section = page
+      .locator("details")
+      .filter({
+        has: page.getByLabel(`Include project ${project.name}`, {
+          exact: true,
+        }),
+      });
+    await expect(section).not.toHaveAttribute("open");
+    await section.locator("summary").first().click();
     await page
       .getByLabel(`Include project ${project.name}`, { exact: true })
       .uncheck();
+  }
   await expect(page.locator(".fit-label")).toContainText("A4 fit");
   await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "Export PDF ↓", exact: true }),
+    page.getByRole("button", { name: "Print / Save as PDF", exact: true }),
   ).toBeDisabled();
   await page
     .getByLabel("I reviewed this tailored resume against the approved profile.")
     .check();
   await expect(
-    page.getByRole("button", { name: "Export PDF ↓", exact: true }),
+    page.getByRole("button", { name: "Print / Save as PDF", exact: true }),
   ).toBeEnabled();
   await page.context().addInitScript(() => {
     window.print = () => {
@@ -174,7 +192,9 @@ test("tailored content removal revalidates layout but still requires fresh user 
     };
   });
   const popupPromise = page.waitForEvent("popup");
-  await page.getByRole("button", { name: "Export PDF ↓", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Print / Save as PDF", exact: true })
+    .click();
   const popup = await popupPromise;
   await expect(popup.locator("html")).toHaveAttribute("data-printed", "yes");
   await expect(popup.locator(".project")).toHaveCount(0);

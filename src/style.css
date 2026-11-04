@@ -1578,3 +1578,23 @@ pre {
 .paper-viewport {
   overflow: auto;
 }
+
+.next-step {
+  max-width: 540px;
+  margin: 0 auto 24px;
+  padding: 0 16px;
+}
+.next-step p {
+  line-height: 1.5;
+}
+.btn.secondary {
+  background: var(--panel, #fff);
+  box-shadow: none;
+}
+.resume-editor details {
+  margin-block: 12px;
+}
+.resume-editor summary {
+  cursor: pointer;
+  line-height: 1.5;
+}

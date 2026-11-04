@@ -77,11 +77,9 @@ export function TailoringReview({
     >
       <h2>Compare with your approved profile</h2>
       <p>
-        Your complete draft is generated automatically. Review and correct it
-        here; you do not need to decide the AI's selections first. Name,
-        contacts, employment titles, employers, dates, education, certifications
-        and links remain approved facts. A capability-based headline can differ
-        from your master headline without changing any employment title.
+        Compare changed wording with your approved facts. Unchanged and omitted
+        items are collapsed; expand them to make corrections. Your profile stays
+        unchanged. Review the full preview before approving export.
       </p>
       {warnings.map((w, i) => (
         <p className="note" key={i}>
@@ -131,32 +129,35 @@ export function TailoringReview({
           />
         </label>
       </details>
-      <fieldset>
-        <legend>
-          Automatically selected approved skills (optional corrections)
-        </legend>
-        {profile.skills.map((s) => (
-          <label className="check" key={s.id}>
-            <input
-              type="checkbox"
-              checked={content.skillIds.includes(s.id)}
-              disabled={
-                busy ||
-                (content.skillIds.length === 1 &&
-                  content.skillIds.includes(s.id))
-              }
-              onChange={(e) =>
-                change((c) => {
-                  c.skillIds = e.target.checked
-                    ? [...c.skillIds, s.id]
-                    : c.skillIds.filter((id) => id !== s.id);
-                })
-              }
-            />
-            {s.text}
-          </label>
-        ))}
-      </fieldset>
+      <details>
+        <summary>Review selected skills</summary>
+        <fieldset>
+          <legend>
+            Automatically selected approved skills (optional corrections)
+          </legend>
+          {profile.skills.map((s) => (
+            <label className="check" key={s.id}>
+              <input
+                type="checkbox"
+                checked={content.skillIds.includes(s.id)}
+                disabled={
+                  busy ||
+                  (content.skillIds.length === 1 &&
+                    content.skillIds.includes(s.id))
+                }
+                onChange={(e) =>
+                  change((c) => {
+                    c.skillIds = e.target.checked
+                      ? [...c.skillIds, s.id]
+                      : c.skillIds.filter((id) => id !== s.id);
+                  })
+                }
+              />
+              {s.text}
+            </label>
+          ))}
+        </fieldset>
+      </details>
       {profile.experience.map((e, i) => {
         const selected = content.experience.find(
           (v) => v.experienceId === e.id,
@@ -191,7 +192,15 @@ export function TailoringReview({
                 b.sourceAchievementIds.includes(a.id),
               );
               return (
-                <div key={a.id}>
+                <details key={a.id} open={!!bullet && bullet.text !== a.text}>
+                  <summary>
+                    Achievement {i + 1}.{k + 1} ·{" "}
+                    {bullet
+                      ? bullet.text !== a.text
+                        ? "Changed wording"
+                        : "Unchanged"
+                      : "Omitted"}
+                  </summary>
                   <p>
                     <strong>Original approved achievement:</strong> {a.text}
                   </p>
@@ -240,7 +249,7 @@ export function TailoringReview({
                       unchanged.
                     </p>
                   )}
-                </div>
+                </details>
               );
             })}
           </fieldset>
@@ -249,8 +258,18 @@ export function TailoringReview({
       {profile.projects.map((p) => {
         const selected = content.projects.find((v) => v.projectId === p.id);
         return (
-          <fieldset key={p.id}>
-            <legend>{p.name}</legend>
+          <details
+            key={p.id}
+            open={!!selected && selected.description !== p.description}
+          >
+            <summary>
+              {p.name} ·{" "}
+              {selected
+                ? selected.description !== p.description
+                  ? "Changed wording"
+                  : "Unchanged"
+                : "Omitted"}
+            </summary>
             <p>
               Approved project:{" "}
               {[p.description, ...p.achievements.map((a) => a.text)].join(" ")}
@@ -303,7 +322,7 @@ export function TailoringReview({
                 />
               </label>
             )}
-          </fieldset>
+          </details>
         );
       })}
       <p>

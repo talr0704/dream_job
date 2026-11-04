@@ -100,7 +100,7 @@ export function Library({
                     onDownload(item.profile, item.twoPages || false)
                   }
                 >
-                  Download PDF
+                  Print / Save as PDF
                 </PixelButton>
                 <PixelButton
                   disabled={!!busy}

@@ -39,9 +39,13 @@ async function approve(page: any) {
   await page
     .getByLabel("I reviewed and confirm the profile facts and links.")
     .check();
-  await page.getByRole("button", { name: "Save profile", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Approve & save profile", exact: true })
+    .click();
   await expect(
-    page.getByText("✓ Confirmed profile", { exact: true }),
+    page.getByText("✓ Approved profile · Saved in this browser", {
+      exact: true,
+    }),
   ).toBeVisible();
 }
 test("review, approval, reload, match, immutable snapshots, duplicate, delete, backup and print", async ({
@@ -67,7 +71,7 @@ test("review, approval, reload, match, immutable snapshots, duplicate, delete, b
   ).toBeVisible();
   await page.getByLabel("Resume version name").fill("Application one");
   await page
-    .getByRole("button", { name: "▣ Save new version", exact: true })
+    .getByRole("button", { name: "▣ Save draft copy", exact: true })
     .click();
   await page.getByRole("button", { name: "My Resumes", exact: true }).click();
   await expect(
@@ -91,7 +95,7 @@ test("review, approval, reload, match, immutable snapshots, duplicate, delete, b
     .fill("Manually edited resume summary.");
   await page.getByLabel("Resume version name").fill("Manual version");
   await page
-    .getByRole("button", { name: "▣ Save new version", exact: true })
+    .getByRole("button", { name: "▣ Save draft copy", exact: true })
     .click();
   await page.getByRole("button", { name: "My Profile", exact: true }).click();
   await expect(
@@ -119,7 +123,9 @@ test("review, approval, reload, match, immutable snapshots, duplicate, delete, b
   await page
     .getByLabel("I reviewed this tailored resume against the approved profile.")
     .check();
-  await page.getByRole("button", { name: "Export PDF ↓", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Print / Save as PDF", exact: true })
+    .click();
   const popup = await popupPromise;
   await expect(popup.locator("html")).toHaveAttribute("data-printed", "yes");
   expect(await popup.locator(".paper").count()).toBe(1);
@@ -303,7 +309,9 @@ test("invalid extraction responses preserve an already approved profile and its 
   }
   await page.reload();
   await expect(
-    page.getByText("✓ Confirmed profile", { exact: true }),
+    page.getByText("✓ Approved profile · Saved in this browser", {
+      exact: true,
+    }),
   ).toBeVisible();
   await expect(page.getByText("Alex Example", { exact: true })).toBeVisible();
 });
@@ -417,7 +425,7 @@ test("one-call tailoring is independent, source-comparable and requires fresh re
   ).toHaveValue("Developed 3 accessible applications.");
   expect(analysisCalls).toBe(0);
   const exportButton = page.getByRole("button", {
-    name: "Export PDF ↓",
+    name: "Print / Save as PDF",
     exact: true,
   });
   await expect(exportButton).toBeDisabled();
@@ -446,7 +454,7 @@ test("one-call tailoring is independent, source-comparable and requires fresh re
   await expect(exportButton).toBeEnabled();
   await page.getByLabel("Resume version name").fill("Reviewed tailoring");
   await page
-    .getByRole("button", { name: "▣ Save new version", exact: true })
+    .getByRole("button", { name: "▣ Save draft copy", exact: true })
     .click();
   await page.getByRole("button", { name: "My Resumes", exact: true }).click();
   await page.getByRole("button", { name: "Open & edit", exact: true }).click();
@@ -507,4 +515,61 @@ test("historical manual resume snapshots reopen without conversion or loss", asy
       return db.resumes.get(id);
     }, historical.id),
   ).toEqual(historical);
+});
+
+test("home guides the next step and changing the job clears analysis, including pending results", async ({
+  page,
+}) => {
+  await mockAPI(page);
+  await page.goto("/");
+  await expect(
+    page.getByRole("button", { name: "Complete your profile →" }),
+  ).toBeEnabled();
+  await approve(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Create a resume →" }).click();
+  const job = page.getByRole("textbox", {
+    name: "Job description",
+    exact: true,
+  });
+  const analyze = page.getByRole("button", {
+    name: "Analyze fit (optional)",
+    exact: true,
+  });
+  await job.fill(
+    "Looking for a TypeScript developer with accessible application experience.",
+  );
+  await analyze.click();
+  const result = page.getByRole("region", { name: "Job match analysis" });
+  await expect(result).toBeVisible();
+  await job.fill(
+    "Looking for a different TypeScript role with accessible application experience.",
+  );
+  await expect(result).toHaveCount(0);
+
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/analyze-job", async (route) => {
+    await pending;
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(analysis),
+    });
+  });
+  const requested = page.waitForRequest("**/api/analyze-job");
+  await analyze.click();
+  await requested;
+  await job.fill(
+    "A third role seeking TypeScript and accessible application development experience.",
+  );
+  release();
+  await expect(analyze).toBeEnabled();
+  await expect(result).toHaveCount(0);
+  const count = await page.evaluate(async () => {
+    const { db } = await import("/src/lib/storage.ts");
+    return db.jobAnalyses.count();
+  });
+  expect(count).toBe(2);
 });
