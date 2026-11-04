@@ -54,6 +54,7 @@ export function Match({
             disabled={
               !!busy || !canUse || !profile.confirmed || job.trim().length < 40
             }
+            className="secondary"
             onClick={analyze}
           >
             Analyze fit (optional)
@@ -75,10 +76,10 @@ export function Match({
             <div className="quest-glyph" aria-hidden="true">
               ✦
             </div>
-            <h2>Your next quest starts here</h2>
+            <h2>Your next resume starts here</h2>
             <p>
-              Paste a job description to reveal matching skills, experience, and
-              requirements that need attention.
+              Paste a job description, then generate a tailored resume. You can
+              check the fit separately if you want.
             </p>
             <div className="pixel-progress" aria-hidden="true">
               <span style={{ width: "0%" }} />

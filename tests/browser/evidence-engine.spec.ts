@@ -102,11 +102,11 @@ test("automatic evidence-ranked drafts change competencies, headlines and projec
       ),
     ).not.toBeChecked();
     await expect(
-      page.getByRole("button", { name: "Export PDF ↓", exact: true }),
+      page.getByRole("button", { name: "Print / Save as PDF", exact: true }),
     ).toBeDisabled();
     await page.getByLabel("Resume version name").fill(sample.role);
     await page
-      .getByRole("button", { name: "▣ Save new version", exact: true })
+      .getByRole("button", { name: "▣ Save draft copy", exact: true })
       .click();
   }
   expect(calls).toBe(3);
@@ -143,7 +143,7 @@ test("automatic evidence-ranked drafts change competencies, headlines and projec
     "failed focused factuality checks",
   );
   await expect(
-    page.getByRole("button", { name: "Export PDF ↓", exact: true }),
+    page.getByRole("button", { name: "Print / Save as PDF", exact: true }),
   ).toBeDisabled();
   await headline.fill(original);
   await page
@@ -155,7 +155,7 @@ test("automatic evidence-ranked drafts change competencies, headlines and projec
     };
   });
   const popupPromise = page.waitForEvent("popup");
-  await page.getByRole("button", { name: "Export PDF ↓", exact: true }).click();
+  await page.getByRole("button", { name: "Print / Save as PDF", exact: true }).click();
   const popup = await popupPromise;
   await expect(popup.locator("html")).toHaveAttribute("data-printed", "yes");
   await expect(popup.locator(".role")).toHaveText(original);

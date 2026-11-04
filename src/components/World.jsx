@@ -30,7 +30,7 @@ export function Scenery() {
     </div>
   );
 }
-export function World({ go }) {
+export function World({ go, loaded, profileReady }) {
   const scene = useRef();
   return (
     <section
@@ -57,7 +57,26 @@ export function World({ go }) {
           <br />
           job
         </h1>
-        <div className="hero-copy">Your future is waiting in the clouds.</div>
+        <div className="hero-copy">
+          Your experience. A resume for your next role.
+        </div>
+        <div className="next-step">
+          <p>
+            {profileReady
+              ? "Your approved profile is ready. Paste a job description to create your resume."
+              : "Start with your experience. Review and save your profile before creating a resume."}
+          </p>
+          <PixelButton
+            disabled={!loaded}
+            onClick={() => go(profileReady ? "match" : "profile")}
+          >
+            {!loaded
+              ? "Opening workspace…"
+              : profileReady
+                ? "Create a resume →"
+                : "Complete your profile →"}
+          </PixelButton>
+        </div>
         <div className="islands">
           {destinations.map(([id, title, icon, copy, bg]) => (
             <button

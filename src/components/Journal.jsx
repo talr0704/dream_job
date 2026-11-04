@@ -402,13 +402,13 @@ export function Journal({
               await onSave(p.data);
             }}
           >
-            Save profile
+            Approve & save profile
           </PixelButton>
           <span role="status">
             {dirty
               ? "Unsaved journal changes"
               : profile.confirmed
-                ? "✓ Confirmed profile"
+                ? "✓ Approved profile · Saved in this browser"
                 : "Draft profile — review before generation"}
           </span>
         </div>

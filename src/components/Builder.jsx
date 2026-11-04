@@ -228,7 +228,7 @@ export function Builder({
             Refine with AI
           </PixelButton>
           <hr />
-          <h2>Keep this version</h2>
+          <h2>Save a draft copy</h2>
           <Field
             label="Resume version name"
             value={title}
@@ -247,7 +247,7 @@ export function Builder({
             disabled={!!busy || !canUse || !resume.confirmed || !title.trim()}
             onClick={() => onSaveVersion(title, folder)}
           >
-            ▣ Save new version
+            ▣ Save draft copy
           </PixelButton>
           <p className="muted">
             Every save creates an independent snapshot. Profile changes never
@@ -265,6 +265,13 @@ export function Builder({
                 : "Measuring layout…"}
             </span>
           </div>
+          {requiresReview && (
+            <p className="note">
+              {reviewed
+                ? "Reviewed · Ready to export. Save a draft copy to keep your changes in this browser."
+                : "Draft · Review against your profile before exporting. You can save a draft copy now."}
+            </p>
+          )}
           {reviewPanel}
           {editing && !requiresReview && (
             <ResumeEditor resume={resume} setResume={setResume} />
@@ -303,7 +310,7 @@ export function Builder({
               }
               onClick={() => download(resume, twoPages)}
             >
-              {busy === "Rendering PDF…" ? busy : "Export PDF ↓"}
+              {busy === "Rendering PDF…" ? busy : "Print / Save as PDF"}
             </PixelButton>
           </div>
           <p className="export-note">

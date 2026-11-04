@@ -93,6 +93,12 @@ function App() {
     [content, setContentState] = useState<ResumeContent | null>(null),
     [contentWarnings, setContentWarnings] = useState<string[]>([]),
     [review, setReview] = useState<SavedResumeV2["review"]>(null);
+  const analysisRevision = useRef(0);
+  function changeJob(value: string) {
+    analysisRevision.current += 1;
+    setJob(value);
+    setResult(null);
+  }
   const contentRef = useRef<ResumeContent | null>(null);
   const exportOverflow = useRef<A4OverflowError | null>(null);
   function clearValidatedOverflow() {
@@ -217,6 +223,8 @@ function App() {
       }
       const saved = await db.approveProfile(canonical, true);
       master.current = saved;
+      analysisRevision.current += 1;
+      setResult(null);
       proposalProfile.current = null;
       setProfile(toJournal(saved));
       setRevision((v) => v + 1);
@@ -271,6 +279,7 @@ function App() {
       if (!master.current)
         throw Error("Approve your professional profile first.");
       const p = structuredClone(master.current);
+      const requestedRevision = analysisRevision.current;
       const analysis = await client.analyzeJob({
         profile: p,
         jobDescription: job,
@@ -282,7 +291,8 @@ function App() {
         analysis,
         createdAt: new Date().toISOString(),
       });
-      setResult(displayAnalysis(analysis, p));
+      if (requestedRevision === analysisRevision.current)
+        setResult(displayAnalysis(analysis, p));
     });
   }
   async function refine(instructions: string) {
@@ -455,6 +465,7 @@ function App() {
       );
       setResume(structuredClone(item.profile));
       setSourceJob(r.jobDescription);
+      analysisRevision.current += 1;
       setJob(r.jobDescription);
       setResult(item.analysis);
       setTwoPages(r.twoPages);
@@ -623,7 +634,7 @@ function App() {
           </div>
         )}
         {screen === "home" ? (
-          <World go={go} />
+          <World go={go} loaded={loaded} profileReady={!!master.current} />
         ) : (
           <Screen
             id={screen}
@@ -654,7 +665,7 @@ function App() {
                   <Match
                     profile={profile}
                     job={job}
-                    setJob={setJob}
+                    setJob={changeJob}
                     result={result}
                     generate={generate}
                     analyze={analyze}
